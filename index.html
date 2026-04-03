@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description"
+        content="Antigravity Physics Simulator — um simulador de física interativo para web com Mecânica, Gravidade, Energia, Termodinâmica, Ondas, Eletromagnetismo, Fluidos e Materiais.">
+    <title>Antigravity — Physics Simulator</title>
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="icon"
+        href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🌌</text></svg>">
+</head>
+
+<body>
+
+    <!-- Stars Background -->
+    <canvas id="stars-canvas"></canvas>
+
+    <!-- ===== LANDING PAGE ===== -->
+    <div id="landing-page">
+        <section class="hero">
+            <div class="hero-badge">🚀 <span>v1.0</span> — Simulador Educacional de Física</div>
+            <h1>Antigravity</h1>
+            <p>Um simulador de física completo e interativo. Explore os pilares da física clássica e moderna em tempo
+                real.</p>
+        </section>
+
+        <section class="modules-section">
+            <h2>Escolha um módulo para explorar</h2>
+            <div class="modules-grid">
+
+                <div class="module-card" data-module="mechanics" onclick="App.openModule('mechanics')">
+                    <div class="module-icon">⚙️</div>
+                    <h3>Mecânica Clássica</h3>
+                    <p class="module-desc">A base do motor físico — leis do movimento e interações.</p>
+                    <div class="module-tags">
+                        <span class="module-tag">Velocidade</span>
+                        <span class="module-tag">Aceleração</span>
+                        <span class="module-tag">Newton</span>
+                        <span class="module-tag">Colisões</span>
+                    </div>
+                </div>
+
+                <div class="module-card" data-module="gravity" onclick="App.openModule('gravity')">
+                    <div class="module-icon">🪐</div>
+                    <h3>Gravidade e Órbitas</h3>
+                    <p class="module-desc">Simulação de corpos celestes e gravitação universal.</p>
+                    <div class="module-tags">
+                        <span class="module-tag">Gravitação</span>
+                        <span class="module-tag">Órbitas</span>
+                        <span class="module-tag">Satélites</span>
+                    </div>
+                </div>
+
+                <div class="module-card" data-module="energy" onclick="App.openModule('energy')">
+                    <div class="module-icon">⚡</div>
+                    <h3>Energia</h3>
+                    <p class="module-desc">Gestão de recursos energéticos e conservação.</p>
+                    <div class="module-tags">
+                        <span class="module-tag">Cinética</span>
+                        <span class="module-tag">Potencial</span>
+                        <span class="module-tag">Conservação</span>
+                    </div>
+                </div>
+
+                <div class="module-card" data-module="thermo" onclick="App.openModule('thermo')">
+                    <div class="module-icon">🔥</div>
+                    <h3>Termodinâmica</h3>
+                    <p class="module-desc">Calor, comportamento térmico e leis da termodinâmica.</p>
+                    <div class="module-tags">
+                        <span class="module-tag">Gases</span>
+                        <span class="module-tag">Temperatura</span>
+                        <span class="module-tag">Entropia</span>
+                    </div>
+                </div>
+
+                <div class="module-card" data-module="waves" onclick="App.openModule('waves')">
+                    <div class="module-icon">🌊</div>
+                    <h3>Ondas e Vibrações</h3>
+                    <p class="module-desc">Fenômenos ondulatórios — som, luz e interferência.</p>
+                    <div class="module-tags">
+                        <span class="module-tag">Frequência</span>
+                        <span class="module-tag">Amplitude</span>
+                        <span class="module-tag">Interferência</span>
+                    </div>
+                </div>
+
+                <div class="module-card" data-module="electro" onclick="App.openModule('electro')">
+                    <div class="module-icon">🔋</div>
+                    <h3>Eletromagnetismo</h3>
+                    <p class="module-desc">Cargas, campos e circuitos elétricos.</p>
+                    <div class="module-tags">
+                        <span class="module-tag">Campos</span>
+                        <span class="module-tag">Corrente</span>
+                        <span class="module-tag">Magnético</span>
+                    </div>
+                </div>
+
+                <div class="module-card" data-module="fluids" onclick="App.openModule('fluids')">
+                    <div class="module-icon">💧</div>
+                    <h3>Fluidos</h3>
+                    <p class="module-desc">Dinâmica de líquidos e gases — pressão e fluxo.</p>
+                    <div class="module-tags">
+                        <span class="module-tag">Pressão</span>
+                        <span class="module-tag">Empuxo</span>
+                        <span class="module-tag">Fluxo</span>
+                    </div>
+                </div>
+
+                <div class="module-card" data-module="materials" onclick="App.openModule('materials')">
+                    <div class="module-icon">🧱</div>
+                    <h3>Física de Materiais</h3>
+                    <p class="module-desc">Propriedades avançadas — deformação e fraturas.</p>
+                    <div class="module-tags">
+                        <span class="module-tag">Deformação</span>
+                        <span class="module-tag">Atrito</span>
+                        <span class="module-tag">Fraturas</span>
+                    </div>
+                </div>
+
+            </div>
+        </section>
+
+        <footer class="landing-footer">
+            <p>Antigravity Physics Simulator © 2026 — Construído com 💜 para educação</p>
+        </footer>
+    </div>
+
+    <!-- ===== SIMULATOR VIEW ===== -->
+    <div id="simulator-view">
+        <div class="sim-topbar">
+            <div class="sim-topbar-left">
+                <button class="btn-back" id="btn-back" onclick="App.goHome()">
+                    ← Voltar
+                </button>
+                <span class="sim-title" id="sim-title">Módulo</span>
+            </div>
+            <div class="sim-topbar-right">
+                <button class="btn-sim active" id="btn-play" onclick="App.togglePlay()">
+                    ▶ Play
+                </button>
+                <button class="btn-sim" id="btn-reset" onclick="App.resetSim()">
+                    ↺ Reset
+                </button>
+                <button class="btn-sim" id="btn-speed" onclick="App.cycleSpeed()">
+                    1x
+                </button>
+            </div>
+        </div>
+
+        <div class="sim-content">
+            <!-- Side Panel — dynamically filled per module -->
+            <aside class="sim-panel" id="sim-panel"></aside>
+
+            <!-- Canvas Area -->
+            <div class="sim-canvas-area">
+                <canvas id="sim-canvas"></canvas>
+                <div class="canvas-info" id="canvas-info"></div>
+                <div class="canvas-hint" id="canvas-hint"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="js/engine.js"></script>
+    <script src="js/renderer.js"></script>
+    <script src="js/ui.js"></script>
+    <script src="js/modules/mechanics.js"></script>
+    <script src="js/modules/gravity.js"></script>
+    <script src="js/modules/energy.js"></script>
+    <script src="js/modules/thermodynamics.js"></script>
+    <script src="js/modules/waves.js"></script>
+    <script src="js/modules/electromagnetism.js"></script>
+    <script src="js/modules/fluids.js"></script>
+    <script src="js/modules/materials.js"></script>
+    <script src="js/app.js"></script>
+</body>
+
+</html>
