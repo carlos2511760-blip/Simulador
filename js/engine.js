@@ -205,4 +205,15 @@ const PhysicsUtils = {
   },
   randomRange(min, max) { return min + Math.random() * (max - min); },
   hslToString(h, s, l, a = 1) { return `hsla(${h}, ${s}%, ${l}%, ${a})`; },
+  
+  /* Bezier multi-point calculation (Recursive De Casteljau) */
+  getBezierPoint(pts, t) {
+    if (!pts || pts.length === 0) return new Vec2();
+    if (pts.length === 1) return pts[0].copy();
+    const nextLayer = [];
+    for (let i = 0; i < pts.length - 1; i++) {
+        nextLayer.push(pts[i].lerp(pts[i+1], t));
+    }
+    return this.getBezierPoint(nextLayer, t);
+  }
 };

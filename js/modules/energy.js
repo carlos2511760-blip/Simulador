@@ -13,7 +13,7 @@ const EnergyModule = {
         gravity: 9.8,
         mass: 5,
         showEnergy: true,
-        friction: 0.005,
+        friction: 0.002,
         trackType: 'Rampa U',
         showHeightGrid: true,
         objectType: '🛹 Skatista',
@@ -22,6 +22,8 @@ const EnergyModule = {
     time: 0,
     trackPoints: [],
     energyHistory: [],
+    editingPoint: null,
+    draggingBody: false,
 
     init(renderer) {
         this.renderer = renderer;
@@ -29,6 +31,7 @@ const EnergyModule = {
         this.time = 0;
         this.energyHistory = [];
         this.loadScenario('skate');
+        this.setupInput();
     },
 
     buildUI(panel) {
@@ -36,25 +39,24 @@ const EnergyModule = {
         UI.buildPanel(panel, {
             sections: [
                 {
-                    title: 'Montanha Russa da Energia',
+                    title: 'Montanha Russa',
                     type: 'scenarios',
                     items: [
                         { label: '🛹 Skate Park', color: '#ffd43b', active: true, onSelect: () => self.loadScenario('skate') },
-                        { label: '🍎 Maçã de Newton', color: '#ff6b6b', onSelect: () => self.loadScenario('freefall') },
-                        { label: '🏹 Estilingue (Mola)', color: '#51cf66', onSelect: () => self.loadScenario('spring') },
-                        { label: '🏗️ Demolição (Pêndulo)', color: '#845ef7', onSelect: () => self.loadScenario('pendulum_energy') },
+                        { label: '🍎 Maçã Newton', color: '#ff6b6b', onSelect: () => self.loadScenario('freefall') },
+                        { label: '🏹 Estilingue', color: '#51cf66', onSelect: () => self.loadScenario('spring') },
+                        { label: '🏗️ Demolição', color: '#845ef7', onSelect: () => self.loadScenario('pendulum_energy') },
                     ]
                 },
                 {
-                    title: 'Física do Objeto',
+                    title: 'Controles',
                     type: 'controls',
                     items: [
-                        { kind: 'select', id: 'en-obj', label: 'Escolha o Objeto', options: ['🛹 Skatista', '🍎 Maçã', '⛸️ Patins', '🎾 Bola', '🎳 Boliche'], value: self.params.objectType, onChange: v => { self.params.objectType = v; self.loadScenario(self.scenario); } },
-                        { kind: 'select', id: 'en-track', label: 'Pista', options: ['Rampa U', 'Rampa W', 'Colinas', 'Abismo'], value: self.params.trackType, onChange: v => { self.params.trackType = v; self.loadScenario(self.scenario); } },
-                        { kind: 'slider', id: 'en-mass', label: 'Massa do Objeto (kg)', min: 1, max: 100, step: 1, value: self.params.mass, unit: '', onChange: v => { self.params.mass = v; } },
-                        { kind: 'slider', id: 'en-friction', label: 'Atrito Suave', min: 0, max: 0.1, step: 0.001, value: self.params.friction, unit: '', onChange: v => { self.params.friction = v; } },
-                        { kind: 'checkbox', id: 'en-grid', label: 'Mostrar Grade de Altura', checked: self.params.showHeightGrid, onChange: v => { self.params.showHeightGrid = v; } },
-                        { kind: 'button', id: 'en-reset', label: '↺ Reiniciar Salto', onClick: () => self.loadScenario(self.scenario) },
+                        { kind: 'select', id: 'en-obj', label: 'Objeto', options: ['🛹 Skatista', '🍎 Maçã', '⛸️ Patins', '🎾 Bola'], value: self.params.objectType, onChange: v => { self.params.objectType = v; self.loadScenario(self.scenario); } },
+                        { kind: 'select', id: 'en-track', label: 'Tipo Pista', options: ['Rampa U', 'Rampa W', 'Colinas', 'Abismo'], value: self.params.trackType, onChange: v => { self.params.trackType = v; self.loadScenario(self.scenario); } },
+                        { kind: 'slider', id: 'en-mass', label: 'Massa (kg)', min: 1, max: 100, step: 1, value: self.params.mass, unit: '', onChange: v => { self.params.mass = v; } },
+                        { kind: 'slider', id: 'en-friction', label: 'Atrito', min: 0, max: 0.1, step: 0.001, value: self.params.friction, unit: '', onChange: v => { self.params.friction = v; } },
+                        { kind: 'button', id: 'en-reset', label: '↺ Reiniciar', onClick: () => self.loadScenario(self.scenario) },
                     ]
                 },
                 {
@@ -70,396 +72,144 @@ const EnergyModule = {
         this.scenario = name;
         this.time = 0;
         this.energyHistory = [];
-        const w = this.renderer.width;
-        const h = this.renderer.height;
-
-        const emojiMap = {
-            '🛹 Skatista': '🛹', '🍎 Maçã': '🍎', '⛸️ Patins': '⛸️', '🎾 Bola': '🎾', '🎳 Boliche': '🎳'
-        };
-        const currentEmoji = emojiMap[this.params.objectType] || '●';
+        const w = this.renderer.width, h = this.renderer.height;
+        const emojis = { '🛹 Skatista': '🛹', '🍎 Maçã': '🍎', '⛸️ Patins': '⛸️', '🎾 Bola': '🎾' };
+        const emoji = emojis[this.params.objectType] || '●';
 
         if (name === 'skate') {
             this.trackPoints = this.generateTrack(w, h, this.params.trackType);
-            this.ball = {
-                t: 0,
-                speed: 0,
-                pos: this.trackPoints[0].copy(),
-                radius: 12,
-                label: currentEmoji,
-                trail: [],
-            };
-            UI.setHint('🛹 Skate Park — observe a Energia Potencial virar Velocidade!');
+            this.ball = { t: 0, speed: 0, pos: this.trackPoints[0].copy(), radius: 15, label: emoji, trail: [] };
+            UI.setHint('🛹 Arraste as bolinhas amarelas para criar pistas loucas!');
         }
 
         if (name === 'freefall') {
-            this.ball = {
-                pos: new Vec2(w / 2, 80),
-                vel: new Vec2(0, 0),
-                radius: 15,
-                label: currentEmoji,
-                trail: [],
-                groundY: h - 60,
-            };
-            UI.setHint('🍎 Maçã de Newton — Queda livre e conservação de energia');
+            this.ball = { pos: new Vec2(w / 2, 80), vel: new Vec2(0, 0), radius: 15, label: emoji, trail: [], groundY: h - 60 };
+            UI.setHint('Arraste a maçã para o alto e solte!');
         }
 
         if (name === 'spring') {
-            this.ball = {
-                pos: new Vec2(w / 2, h / 2),
-                vel: new Vec2(0, 0),
-                restX: w / 2,
-                restY: h / 2,
-                displacement: 150,
-                radius: 18,
-                label: '🏹',
-                trail: [],
-                k: 2,
-                phase: 0,
-            };
-            UI.setHint('🏹 Estilingue — Energia Potencial Elástica armazenada');
+            this.ball = { pos: new Vec2(w / 2, h / 2), vel: new Vec2(0, 0), restX: w / 2, displacement: 200, radius: 15, label: '🏹', trail: [], k: 3, phase: 0 };
+            UI.setHint('Arraste o estilingue para carregar energia!');
         }
 
         if (name === 'pendulum_energy') {
-            const pivotX = w / 2;
-            const pivotY = h * 0.15;
-            const length = h * 0.4;
-            this.ball = {
-                pos: new Vec2(pivotX + Math.sin(1.2) * length, pivotY + Math.cos(1.2) * length),
-                vel: new Vec2(0, 0),
-                pivot: new Vec2(pivotX, pivotY),
-                length: length,
-                angle: 1.2,
-                angularVel: 0,
-                radius: 20,
-                label: '🏗️',
-                trail: [],
-            };
-            UI.setHint('🏗️ Demolição — O movimento periódico do pêndulo');
+            const pivot = new Vec2(w/2, h*0.2);
+            this.ball = { pos: new Vec2(w/2+300, h*0.2+200), vel: new Vec2(0,0), pivot: pivot, length: 400, angle: 1.0, angularVel: 0, radius: 20, label: '🏗️', trail: [] };
+            UI.setHint('Arraste o pêndulo para mudar a altura inicial');
         }
     },
 
     generateTrack(w, h, type) {
-        const points = [];
-        const numPoints = 200;
-        for (let i = 0; i <= numPoints; i++) {
-            const t = i / numPoints;
-            const x = t * w;
-            let y = 0;
-            const baseY = h * 0.2;
-            const bottomY = h - 60;
-            const dr = bottomY - baseY;
+        if (type === 'Rampa U') return [new Vec2(w*0.1, h*0.3), new Vec2(w*0.2, h*0.85), new Vec2(w*0.7, h*0.85), new Vec2(w*0.8, h*0.3)];
+        if (type === 'Rampa W') return [new Vec2(w*0.1, h*0.4), new Vec2(w*0.3, h*0.8), new Vec2(w*0.5, h*0.4), new Vec2(w*0.7, h*0.8), new Vec2(w*0.9, h*0.3)];
+        if (type === 'Colinas') return [new Vec2(w*0.05, h*0.5), new Vec2(w*0.2, h*0.2), new Vec2(w*0.4, h*0.5), new Vec2(w*0.6, h*0.2), new Vec2(w*0.9, h*0.5)];
+        return [new Vec2(w*0.1, h*0.2), new Vec2(w*0.4, h*0.9), new Vec2(w*0.6, h*0.1), new Vec2(w*0.9, h*0.8)];
+    },
 
-            if (type === 'Rampa U') {
-                let tt = t * 2 - 1;
-                y = bottomY - dr * Math.pow(tt, 2);
-            } else if (type === 'Rampa W') {
-                y = baseY + (dr / 2) - (dr / 2) * Math.cos(t * Math.PI * 4);
-            } else if (type === 'Colinas') {
-                y = baseY + (dr / 2) - (dr / 2) * Math.cos(t * Math.PI * 6);
-            } else { // Complexa
-                y = baseY - Math.sin(t * Math.PI * 2) * h * 0.2 - Math.sin(t * Math.PI * 4) * h * 0.08 + Math.sin(t * Math.PI * 6) * h * 0.04;
+    setupInput() {
+        const self = this;
+        this.renderer.canvas.addEventListener('mousedown', (e) => {
+            const rect = self.renderer.canvas.getBoundingClientRect();
+            const mouse = new Vec2(e.clientX - rect.left, e.clientY - rect.top);
+            if (self.ball && mouse.dist(self.ball.pos) < 40) { self.draggingBody = true; return; }
+            if (self.scenario === 'skate') {
+                for (let i = 0; i < self.trackPoints.length; i++) {
+                    if (self.trackPoints[i].dist(mouse) < 25) { self.editingPoint = i; return; }
+                }
             }
-            points.push(new Vec2(x, PhysicsUtils.clamp(y, 10, h + 100)));
-        }
-        return points;
+        });
+        this.renderer.canvas.addEventListener('mousemove', (e) => {
+            const rect = self.renderer.canvas.getBoundingClientRect();
+            const mouse = new Vec2(e.clientX - rect.left, e.clientY - rect.top);
+            if (self.editingPoint !== null) { self.trackPoints[self.editingPoint].set(mouse.x, mouse.y); return; }
+            if (self.draggingBody && self.ball) {
+                if (self.scenario === 'skate') {
+                    let minDist = Infinity, bestT = 0;
+                    for (let i = 0; i <= 80; i++) {
+                        const pt = PhysicsUtils.getBezierPoint(self.trackPoints, i / 80);
+                        const d = pt.dist(mouse); if (d < minDist) { minDist = d; bestT = i / 80; }
+                    }
+                    self.ball.t = bestT; self.ball.speed = 0; self.ball.trail = [];
+                } else if (self.scenario === 'freefall') {
+                   self.ball.pos.set(mouse.x, mouse.y); self.ball.vel.set(0, 0); self.ball.trail = [];
+                } else if (self.scenario === 'pendulum_energy') {
+                   let dir = mouse.sub(self.ball.pivot);
+                   self.ball.angle = Math.atan2(dir.x, dir.y);
+                   self.ball.angularVel = 0; self.ball.trail = [];
+                }
+            }
+        });
+        this.renderer.canvas.addEventListener('mouseup', () => { self.editingPoint = null; self.draggingBody = false; });
     },
 
     update(dt) {
-        this.time += dt;
         const g = this.params.gravity;
-        const friction = this.params.friction;
-
-        if (this.scenario === 'skate' && this.ball) {
-            const pts = this.trackPoints;
-            let idx = Math.floor(this.ball.t * (pts.length - 1));
-            idx = PhysicsUtils.clamp(idx, 0, pts.length - 2);
-            const next = idx + 1;
-
-            const dx = pts[next].x - pts[idx].x;
-            const dy = pts[next].y - pts[idx].y;
-            const segLen = Math.sqrt(dx * dx + dy * dy);
-            const sinAngle = dy / segLen;
-
-            // Acceleration along track
-            const accel = g * 10 * sinAngle - friction * this.ball.speed * 10;
-            this.ball.speed += accel * dt;
-
-            // Move along track
-            this.ball.t += (this.ball.speed * dt) / (this.renderer.width);
-            if (this.ball.t > 1) this.ball.t = 0;
-            if (this.ball.t < 0) this.ball.t = 1;
-
-            const finalIdx = PhysicsUtils.clamp(Math.floor(this.ball.t * (pts.length - 1)), 0, pts.length - 1);
-            this.ball.pos = pts[finalIdx].copy();
-            this.ball.trail.push(this.ball.pos.copy());
-            if (this.ball.trail.length > 60) this.ball.trail.shift();
+        if (this.scenario === 'skate' && this.ball && !this.draggingBody) {
+            const track = this.trackPoints;
+            const p = PhysicsUtils.getBezierPoint(track, this.ball.t);
+            const pNext = PhysicsUtils.getBezierPoint(track, Math.min(this.ball.t + 0.005, 1));
+            const tangent = pNext.sub(p).norm();
+            this.ball.speed += (g * 10 * tangent.y - this.params.friction * this.ball.speed * 10) * dt;
+            this.ball.t += (this.ball.speed * dt) / 800;   // Estimated arc speed
+            if (this.ball.t > 0.99) { this.ball.t = 0.99; this.ball.speed *= -0.4; }
+            if (this.ball.t < 0.01) { this.ball.t = 0.01; this.ball.speed *= -0.4; }
+            this.ball.pos = PhysicsUtils.getBezierPoint(track, this.ball.t);
+            this.ball.trail.push(this.ball.pos.copy()); if (this.ball.trail.length > 60) this.ball.trail.shift();
         }
 
-        if (this.scenario === 'freefall' && this.ball) {
-            this.ball.vel.y += g * 10 * dt;
-            this.ball.vel.y *= (1 - friction);
-            this.ball.pos = this.ball.pos.add(new Vec2(this.ball.vel.x * dt, this.ball.vel.y * dt));
-
-            if (this.ball.pos.y + this.ball.radius > this.ball.groundY) {
-                this.ball.pos.y = this.ball.groundY - this.ball.radius;
-                this.ball.vel.y *= -0.85;
-            }
-            this.ball.trail.push(this.ball.pos.copy());
-            if (this.ball.trail.length > 100) this.ball.trail.shift();
+        if (this.scenario === 'freefall' && this.ball && !this.draggingBody) {
+            this.ball.vel.y += g * 10 * dt; this.ball.pos = this.ball.pos.add(this.ball.vel.mul(dt));
+            if (this.ball.pos.y + this.ball.radius > this.ball.groundY) { this.ball.pos.y = this.ball.groundY - this.ball.radius; this.ball.vel.y *= -0.7; }
+            this.ball.trail.push(this.ball.pos.copy()); if (this.ball.trail.length > 80) this.ball.trail.shift();
         }
 
-        if (this.scenario === 'spring' && this.ball) {
-            this.ball.phase += dt * 3;
-            const damping = 1 - friction * 10;
-            this.ball.displacement *= Math.pow(damping, dt);
-            this.ball.pos.x = this.ball.restX + Math.cos(this.ball.phase) * this.ball.displacement;
-            this.ball.vel = new Vec2(-Math.sin(this.ball.phase) * this.ball.displacement * 3, 0);
-            this.ball.trail.push(this.ball.pos.copy());
-            if (this.ball.trail.length > 100) this.ball.trail.shift();
+        if (this.scenario === 'pendulum_energy' && this.ball && !this.draggingBody) {
+            const acc = -(g * 10 / this.ball.length) * Math.sin(this.ball.angle);
+            this.ball.angularVel += acc * dt; this.ball.angularVel *= 0.999; this.ball.angle += this.ball.angularVel * dt;
+            this.ball.pos = new Vec2(this.ball.pivot.x + Math.sin(this.ball.angle) * this.ball.length, this.ball.pivot.y + Math.cos(this.ball.angle) * this.ball.length);
+            this.ball.trail.push(this.ball.pos.copy()); if (this.ball.trail.length > 100) this.ball.trail.shift();
         }
 
-        if (this.scenario === 'pendulum_energy' && this.ball) {
-            const angularAccel = -(g * 10 / this.ball.length) * Math.sin(this.ball.angle);
-            this.ball.angularVel += angularAccel * dt;
-            this.ball.angularVel *= (1 - friction * 5);
-            this.ball.angle += this.ball.angularVel * dt;
-            this.ball.pos = new Vec2(
-                this.ball.pivot.x + Math.sin(this.ball.angle) * this.ball.length,
-                this.ball.pivot.y + Math.cos(this.ball.angle) * this.ball.length,
-            );
-            this.ball.trail.push(this.ball.pos.copy());
-            if (this.ball.trail.length > 150) this.ball.trail.shift();
-        }
-
-        // Record energy history
         if (this.ball) {
-            const h = this.renderer.height;
-            const mass = this.params.mass;
+            const h = this.renderer.height, mass = this.params.mass;
             let ke = 0, pe = 0;
-
-            if (this.scenario === 'skate') {
-                ke = 0.5 * mass * this.ball.speed * this.ball.speed * 1000;
-                pe = mass * g * (h - this.ball.pos.y) * 10;
-            } else if (this.scenario === 'freefall') {
-                ke = 0.5 * mass * (this.ball.vel.y * this.ball.vel.y) * 0.1;
-                pe = mass * g * (this.ball.groundY - this.ball.pos.y) * 0.1;
-            } else if (this.scenario === 'spring') {
-                const disp = this.ball.pos.x - this.ball.restX;
-                ke = 0.5 * mass * this.ball.vel.x * this.ball.vel.x * 0.1;
-                pe = 0.5 * this.ball.k * disp * disp * 0.5;
-            } else if (this.scenario === 'pendulum_energy') {
-                const linearVel = this.ball.angularVel * this.ball.length;
-                ke = 0.5 * mass * linearVel * linearVel * 0.1;
-                pe = mass * g * (this.ball.length - this.ball.length * Math.cos(this.ball.angle)) * 0.5;
-            }
-
+            if (this.scenario === 'skate') { ke = 0.5 * mass * this.ball.speed * this.ball.speed; pe = mass * g * (h - this.ball.pos.y); }
+            else if (this.scenario === 'freefall') { ke = 0.5 * mass * this.ball.vel.magSq() * 0.1; pe = mass * g * (this.ball.groundY - this.ball.pos.y) * 0.1; }
+            else if (this.scenario === 'pendulum_energy') { ke = 0.5 * mass * (this.ball.angularVel * this.ball.length)**2 * 0.1; pe = mass * g * (this.ball.length - this.ball.length * Math.cos(this.ball.angle)) * 0.1; }
             this.energyHistory.push({ ke, pe, total: ke + pe });
-            if (this.energyHistory.length > 200) this.energyHistory.shift();
+            if (this.energyHistory.length > 150) this.energyHistory.shift();
         }
     },
 
     render(renderer) {
-        renderer.clear('#08080f');
-        renderer.drawGrid(60, 'rgba(255,212,59,0.02)');
+        renderer.clear('#08080f'); renderer.drawGrid(60);
+        const w = renderer.width, h = renderer.height;
 
-        const w = renderer.width;
-        const h = renderer.height;
-
-        // Scenario-specific rendering
         if (this.scenario === 'skate') {
-            // Height grid
-            if (this.params.showHeightGrid) {
-                for (let i = 0; i <= 10; i++) {
-                    const hy = h - 60 - ((h - 60 - h * 0.2) / 10) * i;
-                    if (hy > 0) {
-                        renderer.drawLine(new Vec2(0, hy), new Vec2(w, hy), 'rgba(255,255,255,0.06)', 1, [2, 4]);
-                        renderer.drawText(`${(i * 10)}m`, 10, hy - 15, { color: 'rgba(255,255,255,0.2)', font: '10px Inter' });
-                    }
-                }
-            }
-            
-            // Draw track
-            const ctx = renderer.ctx;
-            ctx.beginPath();
-            for (let i = 0; i < this.trackPoints.length; i++) {
-                const p = this.trackPoints[i];
-                if (i === 0) ctx.moveTo(p.x, p.y);
-                else ctx.lineTo(p.x, p.y);
-            }
-            ctx.strokeStyle = 'rgba(255,212,59,0.3)';
-            ctx.lineWidth = 3;
+            const ctx = renderer.ctx, track = this.trackPoints;
+            ctx.beginPath(); ctx.strokeStyle = 'rgba(255,212,59,0.5)'; ctx.lineWidth = 10; ctx.lineCap = 'round';
+            for (let i = 0; i <= 60; i++) { const p = PhysicsUtils.getBezierPoint(track, i/60); if (i === 0) ctx.moveTo(p.x, p.y); else ctx.lineTo(p.x, p.y); }
             ctx.stroke();
+            for (const p of track) { renderer.drawCircle(p.x, p.y, 7, '#ffd43b'); }
         }
 
-        if (this.scenario === 'freefall') {
-            // Ground
-            renderer.drawRect(0, this.ball.groundY, w, h - this.ball.groundY, 'rgba(255,107,107,0.05)');
-            renderer.drawLine(new Vec2(0, this.ball.groundY), new Vec2(w, this.ball.groundY), 'rgba(255,107,107,0.3)', 2);
-            // Height indicator
-            if (this.ball) {
-                renderer.drawLine(
-                    new Vec2(w * 0.1, this.ball.pos.y),
-                    new Vec2(w * 0.1, this.ball.groundY),
-                    'rgba(255,212,59,0.3)', 1, [4, 4]
-                );
-                renderer.drawText(`h = ${((this.ball.groundY - this.ball.pos.y) / 10).toFixed(1)} m`,
-                    w * 0.1 + 10, (this.ball.pos.y + this.ball.groundY) / 2,
-                    { color: 'rgba(255,212,59,0.6)', font: '11px JetBrains Mono' }
-                );
-            }
-        }
-
-        if (this.scenario === 'spring') {
-            // Draw spring
-            renderer.drawLine(
-                new Vec2(this.ball.restX - 200, h / 2),
-                new Vec2(this.ball.restX + 200, h / 2),
-                'rgba(81,207,102,0.15)', 1, [4, 4]
-            );
-            // Rest position line
-            renderer.drawLine(
-                new Vec2(this.ball.restX, h / 2 - 40),
-                new Vec2(this.ball.restX, h / 2 + 40),
-                'rgba(255,255,255,0.1)', 1, [2, 4]
-            );
-            // Draw zigzag spring
-            if (this.ball) {
-                const springStart = new Vec2(w * 0.1, h / 2);
-                const springEnd = this.ball.pos;
-                const ctx = renderer.ctx;
-                ctx.save();
-                ctx.strokeStyle = 'rgba(81,207,102,0.5)';
-                ctx.lineWidth = 2;
-                ctx.beginPath();
-                const segs = 20;
-                for (let i = 0; i <= segs; i++) {
-                    const t = i / segs;
-                    const x = springStart.x + (springEnd.x - springStart.x) * t;
-                    const zigzag = (i % 2 === 0 ? 1 : -1) * 10 * (i > 0 && i < segs ? 1 : 0);
-                    const y = h / 2 + zigzag;
-                    if (i === 0) ctx.moveTo(x, y);
-                    else ctx.lineTo(x, y);
-                }
-                ctx.stroke();
-                ctx.restore();
-                // Wall
-                renderer.drawRect(w * 0.1 - 10, h / 2 - 30, 10, 60, 'rgba(255,255,255,0.1)');
-            }
-        }
-
-        if (this.scenario === 'pendulum_energy' && this.ball) {
-            renderer.drawLine(this.ball.pivot, this.ball.pos, 'rgba(255,255,255,0.3)', 2);
-            renderer.drawCircle(this.ball.pivot.x, this.ball.pivot.y, 5, 'rgba(255,255,255,0.5)');
-            // Reference line
-            renderer.drawLine(
-                this.ball.pivot,
-                new Vec2(this.ball.pivot.x, this.ball.pivot.y + this.ball.length),
-                'rgba(255,255,255,0.05)', 1, [3, 5]
-            );
-        }
-
-        // Draw object (emoji or ball)
         if (this.ball) {
-            if (this.ball.trail.length > 1) {
-                renderer.drawTrail(this.ball.trail, '#ffd43b', 1.5);
-            }
-            
-            if (this.ball.label) {
-                renderer.drawText(this.ball.label, this.ball.pos.x, this.ball.pos.y, {
-                   font: `${this.ball.radius * 2.2}px Arial`, align: 'center', baseline: 'middle'
-                });
-            } else {
-                renderer.drawBody(new Body({
-                    pos: this.ball.pos,
-                    radius: this.ball.radius,
-                    color: this.ball.color || '#ffd43b',
-                }), this.ball.color || '#ffd43b');
-            }
+            if (this.ball.trail.length > 1) renderer.drawTrail(this.ball.trail, '#ffd43b');
+            const track = this.trackPoints;
+            const p = PhysicsUtils.getBezierPoint(track, this.ball.t);
+            const pNext = PhysicsUtils.getBezierPoint(track, Math.min(this.ball.t + 0.01, 1));
+            const tangent = pNext.sub(p).norm();
+            let normal = new Vec2(-tangent.y, tangent.x); if (normal.y > 0) normal.mul(-1);
+            const renderPos = (this.scenario === 'skate') ? this.ball.pos.add(normal.mul(this.ball.radius)) : this.ball.pos;
+            renderer.drawText(this.ball.label, renderPos.x, renderPos.y, { font: `${this.ball.radius * 2.8}px Arial`, align: 'center', baseline: 'bottom' });
         }
 
-        // Energy bars
-        if (this.params.showEnergy && this.energyHistory.length > 0) {
+        if (this.energyHistory.length > 0) {
             const latest = this.energyHistory[this.energyHistory.length - 1];
-            const maxE = Math.max(latest.total, 1);
-            const barW = 180;
-            const barH = 14;
-            const barX = w - barW - 20;
-            const barY = 20;
-
-            // Background
-            renderer.drawRect(barX - 10, barY - 10, barW + 20, 100, 'rgba(0,0,0,0.5)');
-
-            // KE bar
-            renderer.drawText('EC', barX - 8, barY + 2, { color: '#ff6b6b', font: '10px JetBrains Mono', align: 'right' });
-            renderer.drawRect(barX, barY, barW, barH, 'rgba(255,255,255,0.05)');
-            renderer.drawRect(barX, barY, barW * PhysicsUtils.clamp(latest.ke / maxE, 0, 1), barH, '#ff6b6b');
-            renderer.drawText(latest.ke.toFixed(0) + ' J', barX + barW + 5, barY + 2, { color: '#ff6b6b', font: '10px JetBrains Mono' });
-
-            // PE bar
-            renderer.drawText('EP', barX - 8, barY + barH + 8, { color: '#339af0', font: '10px JetBrains Mono', align: 'right' });
-            renderer.drawRect(barX, barY + barH + 6, barW, barH, 'rgba(255,255,255,0.05)');
-            renderer.drawRect(barX, barY + barH + 6, barW * PhysicsUtils.clamp(latest.pe / maxE, 0, 1), barH, '#339af0');
-            renderer.drawText(latest.pe.toFixed(0) + ' J', barX + barW + 5, barY + barH + 8, { color: '#339af0', font: '10px JetBrains Mono' });
-
-            // Total bar
-            renderer.drawText('ET', barX - 8, barY + (barH + 6) * 2 + 2, { color: '#51cf66', font: '10px JetBrains Mono', align: 'right' });
-            renderer.drawRect(barX, barY + (barH + 6) * 2, barW, barH, 'rgba(255,255,255,0.05)');
-            renderer.drawRect(barX, barY + (barH + 6) * 2, barW * PhysicsUtils.clamp(latest.total / maxE, 0, 1), barH, '#51cf66');
-            renderer.drawText(latest.total.toFixed(0) + ' J', barX + barW + 5, barY + (barH + 6) * 2 + 2, { color: '#51cf66', font: '10px JetBrains Mono' });
-
-            // Energy graph
-            const graphX = barX;
-            const graphY = barY + 80;
-            const graphW = barW;
-            const graphH = 60;
-            renderer.drawRect(graphX, graphY, graphW, graphH, 'rgba(255,255,255,0.03)');
-
-            if (this.energyHistory.length > 2) {
-                const maxHist = Math.max(...this.energyHistory.map(e => e.total), 1);
-                const ctx = renderer.ctx;
-
-                // KE line
-                ctx.beginPath();
-                for (let i = 0; i < this.energyHistory.length; i++) {
-                    const x = graphX + (i / this.energyHistory.length) * graphW;
-                    const y = graphY + graphH - (this.energyHistory[i].ke / maxHist) * graphH;
-                    if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
-                }
-                ctx.strokeStyle = 'rgba(255,107,107,0.6)';
-                ctx.lineWidth = 1;
-                ctx.stroke();
-
-                // PE line
-                ctx.beginPath();
-                for (let i = 0; i < this.energyHistory.length; i++) {
-                    const x = graphX + (i / this.energyHistory.length) * graphW;
-                    const y = graphY + graphH - (this.energyHistory[i].pe / maxHist) * graphH;
-                    if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
-                }
-                ctx.strokeStyle = 'rgba(51,154,240,0.6)';
-                ctx.lineWidth = 1;
-                ctx.stroke();
-            }
+            UI.updateInfo('energy-info', `EC (Cinética): ${latest.ke.toFixed(0)} J<br>EP (Potencial): ${latest.pe.toFixed(0)} J<br>ET (Total): ${latest.total.toFixed(0)} J`);
+            UI.setInfoPills([`⚡ Energia`, `E = ${latest.total.toFixed(0)} J`]);
         }
-
-        const latest = this.energyHistory.length > 0 ? this.energyHistory[this.energyHistory.length - 1] : { ke: 0, pe: 0, total: 0 };
-        UI.updateInfo('energy-info', `
-      EC (Cinética): ${latest.ke.toFixed(1)} J<br>
-      EP (Potencial): ${latest.pe.toFixed(1)} J<br>
-      ET (Total): ${latest.total.toFixed(1)} J<br>
-      Massa: ${this.params.mass} kg
-    `);
-
-        UI.setInfoPills([
-            `⚡ Energia`,
-            `EC = ${latest.ke.toFixed(0)} J`,
-            `EP = ${latest.pe.toFixed(0)} J`,
-        ]);
     },
 
-    destroy() {
-        this.ball = null;
-        this.energyHistory = [];
-        this.trackPoints = [];
-    }
+    destroy() { this.ball = null; }
 };

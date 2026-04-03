@@ -19,9 +19,11 @@ const MechanicsModule = {
         showTrails: true,
         restitution: 0.6,
         numBalls: 5,
+        trackPoints: [], 
     },
     dragging: null,
     dragStart: null,
+    editingPoint: null,
 
     init(renderer) {
         this.renderer = renderer;
@@ -46,15 +48,17 @@ const MechanicsModule = {
                     ]
                 },
                 {
-                    title: 'Controles de Lançamento',
+                    title: 'Controles',
                     type: 'controls',
                     items: [
-                        { kind: 'select', id: 'mech-type', label: 'Projétil', options: ['🏀 Basquete', '⚽ Futebol', '🎾 Tênis', '💣 Bomba Explisiva', '🍉 Melancia'], value: self.params.projectileType, onChange: v => { self.params.projectileType = v; } },
+                        { kind: 'select', id: 'mech-type', label: 'Projétil', options: ['🏀 Basquete', '⚽ Futebol', '🎾 Tênis', '💣 Bombe Explisiva', '🍉 Melancia'], value: self.params.projectileType, onChange: v => { self.params.projectileType = v; } },
                         { kind: 'slider', id: 'mech-gravity', label: 'Gravidade (g)', min: 0, max: 30, step: 0.1, value: self.params.gravity, unit: ' m/s²', onChange: v => { self.params.gravity = v; } },
-                        { kind: 'slider', id: 'mech-angle', label: 'Ângulo de Disparo', min: 0, max: 90, step: 1, value: self.params.angle, unit: '°', onChange: v => { self.params.angle = v; } },
-                        { kind: 'slider', id: 'mech-speed', label: 'Poder do Canhão', min: 50, max: 1000, step: 10, value: self.params.speed, unit: '', onChange: v => { self.params.speed = v; } },
+                        { kind: 'slider', id: 'mech-angle', label: 'Ângulo', min: 0, max: 90, step: 1, value: self.params.angle, unit: '°', onChange: v => { self.params.angle = v; } },
+                        { kind: 'slider', id: 'mech-speed', label: 'Poder', min: 50, max: 1000, step: 10, value: self.params.speed, unit: '', onChange: v => { self.params.speed = v; } },
                         { kind: 'button', id: 'mech-launch', label: '🚀 DISPARAR!', onClick: () => self.launchProjectile() },
-                        { kind: 'button', id: 'mech-clear', label: '🗑️ Limpar Tudo', onClick: () => self.world.clear() },
+                        { kind: 'button', id: 'mech-track-hills', label: '⛰️ Pista Colinas', onClick: () => self.setupInclineTrack('hills') },
+                        { kind: 'button', id: 'mech-track-u', label: '🛹 Pista U', onClick: () => self.setupInclineTrack('u') },
+                        { kind: 'button', id: 'mech-clear', label: '🗑️ Limpar Tudo', onClick: () => { self.world.clear(); self.explosions = []; } },
                     ]
                 },
                 {
@@ -69,25 +73,23 @@ const MechanicsModule = {
     loadScenario(name) {
         this.scenario = name;
         this.world.clear();
+        this.explosions = [];
         const w = this.renderer.width;
         const h = this.renderer.height;
 
         if (name === 'projectile') {
             this.world.gravity = new Vec2(0, this.params.gravity * 10);
-            this.world.bounds = { x: 0, y: 0, w, h };
-            // Ground
-            UI.setHint('Clique em "Lançar Projétil" ou arraste no canvas para lançar');
+            UI.setHint('Arraste o círculo vermelho ou use os controles para disparar!');
         }
 
         if (name === 'collisions') {
             this.world.gravity = new Vec2(0, 0);
-            this.world.bounds = { x: 0, y: 0, w, h };
             const emojis = ['🦁', '🐯', '🐼', '🐨', '🐷', '🐸'];
             for (let i = 0; i < 6; i++) {
                 const r = 30;
                 this.world.addBody(new Body({
-                    pos: new Vec2(PhysicsUtils.randomRange(r + 50, w - r - 50), PhysicsUtils.randomRange(r + 50, h - r - 50)),
-                    vel: Vec2.random(PhysicsUtils.randomRange(100, 300)),
+                    pos: new Vec2(PhysicsUtils.randomRange(100, w-100), PhysicsUtils.randomRange(100, h-100)),
+                    vel: Vec2.random(200),
                     radius: r,
                     mass: 5,
                     label: emojis[i % emojis.length],
@@ -95,43 +97,56 @@ const MechanicsModule = {
                     maxTrail: 40,
                 }));
             }
-            UI.setHint('Choque de Monstros — veja as faíscas voarem no impacto!');
+            UI.setHint('Choque de Monstros — arraste-os para causar impacto!');
         }
 
         if (name === 'incline') {
             this.world.gravity = new Vec2(0, this.params.gravity * 10);
-            this.world.bounds = { x: 0, y: 0, w, h };
+            this.setupInclineTrack('u');
             this.world.addBody(new Body({
-                pos: new Vec2(w * 0.15, h * 0.2),
-                vel: new Vec2(0, 0),
+                pos: this.params.trackPoints[0].copy(),
                 radius: 20,
                 mass: 2,
                 label: '⛷️',
                 maxTrail: 100,
             }));
-            UI.setHint('Tobogã Radical — o esquiador acelera pela rampa');
+            UI.setHint('⛷️ Tobogã — Arraste as bolinhas amarelas para mudar o trajeto!');
         }
 
         if (name === 'pendulum') {
             this.world.gravity = new Vec2(0, this.params.gravity * 10);
-            this.world.bounds = null;
-            const pivotX = w / 2;
-            const pivotY = h * 0.2;
-            const length = h * 0.5;
-            const angle = Math.PI / 3;
             const bob = new Body({
-                pos: new Vec2(pivotX + Math.sin(angle) * length, pivotY + Math.cos(angle) * length),
-                vel: new Vec2(0, 0),
+                pos: new Vec2(w/2 + 200, h*0.2 + 300),
                 radius: 25,
                 mass: 10,
                 label: '🕰️',
                 maxTrail: 150,
             });
-            bob.userData.pivot = new Vec2(pivotX, pivotY);
-            bob.userData.length = length;
+            bob.userData.pivot = new Vec2(w/2, h*0.2);
+            bob.userData.length = 400;
             bob.userData.isPendulum = true;
             this.world.addBody(bob);
-            UI.setHint('O Grande Relógio — analise o período de oscilação');
+            UI.setHint('Pêndulo — arraste a bola para mudar a amplitude');
+        }
+    },
+
+    setupInclineTrack(type) {
+        const w = this.renderer.width;
+        const h = this.renderer.height;
+        if (type === 'u') {
+            this.params.trackPoints = [
+                new Vec2(w * 0.1, h * 0.3),
+                new Vec2(w * 0.2, h * 0.8),
+                new Vec2(w * 0.5, h * 0.8),
+                new Vec2(w * 0.6, h * 0.3),
+            ];
+        } else {
+            this.params.trackPoints = [
+                new Vec2(w * 0.05, h * 0.3),
+                new Vec2(w * 0.25, h * 0.6),
+                new Vec2(w * 0.45, h * 0.2),
+                new Vec2(w * 0.75, h * 0.8),
+            ];
         }
     },
 
@@ -140,22 +155,17 @@ const MechanicsModule = {
         const rad = this.params.angle * Math.PI / 180;
         const vx = this.params.speed * Math.cos(rad) * 0.8;
         const vy = -this.params.speed * Math.sin(rad) * 0.8;
-        const emojiMap = {
-            '🏀 Basquete': '🏀', '⚽ Futebol': '⚽', '🎾 Tênis': '🎾',
-            '💣 Bomba Explisiva': '💣', '🍉 Melancia': '🍉'
-        };
+        const emojiMap = { '🏀 Basquete': '🏀', '⚽ Futebol': '⚽', '🎾 Tênis': '🎾', '💣 Bombe Explisiva': '💣', '🍉 Melancia': '🍉' };
         const ball = new Body({
-            pos: new Vec2(50, h - 50),
+            pos: new Vec2(50, h - 55),
             vel: new Vec2(vx, vy),
             radius: 18,
             mass: 2,
             label: emojiMap[this.params.projectileType] || '●',
             restitution: 0.6,
-            maxTrail: 200,
+            maxTrail: 100,
         });
-        if (this.params.projectileType.includes('Bomba')) {
-            ball.userData.isBomb = true;
-        }
+        if (this.params.projectileType.includes('Bomb')) ball.userData.isBomb = true;
         this.world.addBody(ball);
     },
 
@@ -163,57 +173,70 @@ const MechanicsModule = {
         const self = this;
         canvas.addEventListener('mousedown', (e) => {
             const rect = canvas.getBoundingClientRect();
-            const mx = e.clientX - rect.left;
-            const my = e.clientY - rect.top;
+            const mouse = new Vec2(e.clientX - rect.left, e.clientY - rect.top);
 
-            // Check if clicking on a body
+            if (self.scenario === 'incline') {
+                for (let i = 0; i < self.params.trackPoints.length; i++) {
+                    if (self.params.trackPoints[i].dist(mouse) < 25) { self.editingPoint = i; return; }
+                }
+            }
+
             for (const b of self.world.bodies) {
-                if (b.pos.dist(new Vec2(mx, my)) < b.radius + 5) {
+                if (b.pos.dist(mouse) < b.radius + 15) {
                     self.dragging = b;
-                    self.dragStart = new Vec2(mx, my);
+                    self.dragStart = mouse.copy();
                     return;
                 }
             }
 
-            // Start drag for launch
             if (self.scenario === 'projectile' || self.scenario === 'collisions') {
-                self.dragStart = new Vec2(mx, my);
+                self.dragStart = mouse.copy();
             }
         });
 
         canvas.addEventListener('mousemove', (e) => {
-            if (!self.dragging && !self.dragStart) return;
             const rect = canvas.getBoundingClientRect();
-            const mx = e.clientX - rect.left;
-            const my = e.clientY - rect.top;
+            const mouse = new Vec2(e.clientX - rect.left, e.clientY - rect.top);
+
+            if (self.editingPoint !== null) {
+                self.params.trackPoints[self.editingPoint].set(mouse.x, mouse.y);
+                return;
+            }
+
             if (self.dragging) {
-                self.dragging.pos.set(mx, my);
+                if (self.scenario === 'incline' && self.dragging.label === '⛷️') {
+                    let minDist = Infinity, bestP = null;
+                    for (let i = 0; i <= 50; i++) {
+                        const p = PhysicsUtils.getBezierPoint(self.params.trackPoints, i / 50);
+                        const d = p.dist(mouse);
+                        if (d < minDist) { minDist = d; bestP = p; }
+                    }
+                    self.dragging.pos.set(bestP.x, bestP.y);
+                } else {
+                    self.dragging.pos.set(mouse.x, mouse.y);
+                }
                 self.dragging.vel.set(0, 0);
+                self.dragging.trail = [];
             }
         });
 
         canvas.addEventListener('mouseup', (e) => {
             const rect = canvas.getBoundingClientRect();
-            const mx = e.clientX - rect.left;
-            const my = e.clientY - rect.top;
+            const mouse = new Vec2(e.clientX - rect.left, e.clientY - rect.top);
 
-            if (self.dragging) {
-                self.dragging = null;
-                self.dragStart = null;
-                return;
-            }
+            if (self.editingPoint !== null) { self.editingPoint = null; return; }
+            if (self.dragging) { self.dragging = null; self.dragStart = null; return; }
 
-            if (self.dragStart) {
-                const diff = new Vec2(mx, my).sub(self.dragStart);
-                if (diff.mag() > 10) {
+            if (self.dragStart && (self.scenario === 'projectile' || self.scenario === 'collisions')) {
+                const diff = mouse.sub(self.dragStart);
+                if (diff.mag() > 15) {
                     const ball = new Body({
                         pos: self.dragStart.copy(),
                         vel: diff.mul(-2),
-                        radius: PhysicsUtils.randomRange(8, 18),
-                        mass: PhysicsUtils.randomRange(1, 5),
-                        color: `hsl(${Math.random() * 360}, 70%, 60%)`,
-                        restitution: self.params.restitution,
-                        maxTrail: 200,
+                        radius: PhysicsUtils.randomRange(10, 18),
+                        mass: 2,
+                        color: `hsl(${Math.random() * 360}, 70%, 65%)`,
+                        maxTrail: 100,
                     });
                     self.world.addBody(ball);
                 }
@@ -225,178 +248,115 @@ const MechanicsModule = {
     update(dt) {
         this.world.gravity = new Vec2(0, this.params.gravity * 10);
 
-        // Pendulum constraint
         if (this.scenario === 'pendulum') {
             for (const b of this.world.bodies) {
-                if (b.userData.isPendulum) {
-                    const pivot = b.userData.pivot;
-                    const len = b.userData.length;
-                    const dir = b.pos.sub(pivot);
-                    const dist = dir.mag();
-                    if (dist > 0) {
-                        b.pos = pivot.add(dir.norm().mul(len));
-                        const tangent = new Vec2(-dir.y, dir.x).norm();
-                        const velTangent = b.vel.dot(tangent);
-                        b.vel = tangent.mul(velTangent);
-                    }
-                    // Gravity component
+                if (b.userData.isPendulum && this.dragging !== b) {
+                    const pivot = b.userData.pivot, len = b.userData.length;
+                    let dir = b.pos.sub(pivot);
+                    b.pos = pivot.add(dir.norm().mul(len));
+                    const tangent = new Vec2(-dir.y, dir.x).norm();
+                    b.vel = tangent.mul(b.vel.dot(tangent));
                     b.applyForce(new Vec2(0, b.mass * this.params.gravity * 10));
                     b.update(dt);
                     b.acc = new Vec2();
-                    return; // Skip world step for pendulum
                 }
             }
         }
 
-        // Incline — constrain ball to ramp surface
         if (this.scenario === 'incline') {
+            const track = this.params.trackPoints;
             for (const b of this.world.bodies) {
-                const w = this.renderer.width;
-                const h = this.renderer.height;
-                // Ramp from top-left quarter to bottom-right
-                const rampStart = new Vec2(w * 0.1, h * 0.3);
-                const rampEnd = new Vec2(w * 0.7, h - 60);
-                const rampDir = rampEnd.sub(rampStart).norm();
-                const rampNormal = new Vec2(-rampDir.y, rampDir.x);
+                if (b.label !== '⛷️' || this.dragging === b) continue;
 
-                // Project ball onto ramp line
-                const toBall = b.pos.sub(rampStart);
-                const projDist = toBall.dot(rampNormal);
-
-                if (projDist < b.radius && b.pos.x >= rampStart.x && b.pos.x <= rampEnd.x) {
-                    b.pos = b.pos.add(rampNormal.mul(b.radius - projDist));
-                    const velNorm = b.vel.dot(rampNormal);
-                    if (velNorm < 0) {
-                        b.vel = b.vel.sub(rampNormal.mul(velNorm * 1.02));
+                let minDist = Infinity, closestPoint = null, closestTangent = null;
+                const iterations = 60;
+                for (let i = 0; i <= iterations; i++) {
+                    const t = i / iterations;
+                    const p = PhysicsUtils.getBezierPoint(track, t);
+                    const d = b.pos.dist(p);
+                    if (d < minDist) {
+                        minDist = d; closestPoint = p;
+                        const pNext = PhysicsUtils.getBezierPoint(track, Math.min(t + 0.01, 1));
+                        closestTangent = pNext.sub(p).norm();
                     }
                 }
 
-                // Floor
-                if (b.pos.y + b.radius > h - 40) {
-                    b.pos.y = h - 40 - b.radius;
-                    b.vel.y *= -b.restitution;
+                if (minDist < 60) {
+                    const normal = new Vec2(-closestTangent.y, closestTangent.x);
+                    if (normal.y > 0) normal.mul(-1);
+                    b.pos = closestPoint.add(normal.mul(b.radius));
+                    const velMag = b.vel.dot(closestTangent);
+                    const slopeForce = new Vec2(0, this.params.gravity * 10).dot(closestTangent);
+                    b.vel = closestTangent.mul((velMag + slopeForce * dt) * 0.995);
                 }
             }
         }
 
         this.world.step(dt);
 
-        // Explosion effects logic
-        const g = this.params.gravity;
         for (let i = 0; i < this.world.bodies.length; i++) {
             const b = this.world.bodies[i];
-            
-            // Bomb explosion on floor
-            if (b.userData.isBomb && b.pos.y + b.radius >= this.renderer.height - 45 && Math.abs(b.vel.y) > 50) {
-                for(let k=0; k<25; k++) {
-                    this.explosions.push({
-                        x: b.pos.x, y: b.pos.y,
-                        vx: (Math.random()-0.5)*400, vy: -Math.random()*400,
-                        life: 1.0, color: '#ff922b'
-                    });
-                }
-                this.world.bodies.splice(i, 1);
-                i--;
-                continue;
+            if (b.userData.isBomb && b.pos.y + b.radius >= this.renderer.height - 45) {
+                for(let k=0; k<20; k++) this.explosions.push({ x: b.pos.x, y: b.pos.y, vx: (Math.random()-0.5)*400, vy: -Math.random()*400, life: 1.0 });
+                this.world.bodies.splice(i, 1); i--;
             }
         }
 
-        if (this.explosions) {
-            for (let i = this.explosions.length - 1; i >= 0; i--) {
-                const ex = this.explosions[i];
-                ex.x += ex.vx * dt;
-                ex.y += ex.vy * dt;
-                ex.vy += g * 10 * dt;
-                ex.life -= dt * 1.5;
-                if (ex.life <= 0) this.explosions.splice(i, 1);
-            }
+        for (let i = this.explosions.length - 1; i >= 0; i--) {
+            const ex = this.explosions[i];
+            ex.x += ex.vx * dt; ex.y += ex.vy * dt; ex.vy += this.params.gravity * 10 * dt;
+            ex.life -= dt * 1.5;
+            if (ex.life <= 0) this.explosions.splice(i, 1);
         }
-
-        // Clean up off-screen bodies
-        this.world.bodies = this.world.bodies.filter(b => b.pos.x > -100 && b.pos.x < this.renderer.width + 100);
     },
 
     render(renderer) {
         renderer.clear();
         renderer.drawGrid(60);
+        const w = renderer.width, h = renderer.height;
 
-        const w = renderer.width;
-        const h = renderer.height;
-
-        // Draw ground line for projectile / incline
-        if (this.scenario === 'projectile') {
-            renderer.drawRect(0, h - 40, w, 40, 'rgba(255,255,255,0.03)');
-            renderer.drawLine(new Vec2(0, h - 40), new Vec2(w, h - 40), 'rgba(255,107,107,0.3)', 2);
-            // Launch position indicator
-            renderer.drawCircle(50, h - 50, 6, 'rgba(255,107,107,0.5)');
+        if (this.scenario === 'projectile' || this.scenario === 'incline') {
+            renderer.drawRect(0, h - 40, w, 40, 'rgba(255,255,255,0.02)');
+            renderer.drawLine(new Vec2(0, h - 40), new Vec2(w, h - 40), 'rgba(255,255,255,0.1)', 1);
         }
 
         if (this.scenario === 'incline') {
-            // Draw ramp
-            const rampStart = new Vec2(w * 0.1, h * 0.3);
-            const rampEnd = new Vec2(w * 0.7, h - 60);
-            renderer.drawLine(rampStart, rampEnd, 'rgba(34,184,207,0.6)', 3);
-            // Floor
-            renderer.drawRect(0, h - 40, w, 40, 'rgba(255,255,255,0.03)');
-            renderer.drawLine(new Vec2(0, h - 40), new Vec2(w, h - 40), 'rgba(34,184,207,0.3)', 2);
+            const ctx = renderer.ctx, track = this.params.trackPoints;
+            ctx.beginPath();
+            ctx.strokeStyle = 'rgba(34,184,207,0.7)'; ctx.lineWidth = 8; ctx.lineCap = 'round';
+            for (let i = 0; i <= 50; i++) {
+                const p = PhysicsUtils.getBezierPoint(track, i / 50);
+                if (i === 0) ctx.moveTo(p.x, p.y); else ctx.lineTo(p.x, p.y);
+            }
+            ctx.stroke();
+            for (const p of track) { renderer.drawCircle(p.x, p.y, 7, '#ffd43b'); }
         }
 
         if (this.scenario === 'pendulum') {
             for (const b of this.world.bodies) {
-                if (b.userData.isPendulum && b.userData.pivot) {
-                    // Draw string
-                    renderer.drawLine(b.userData.pivot, b.pos, 'rgba(255,255,255,0.3)', 2);
-                    // Pivot
-                    renderer.drawCircle(b.userData.pivot.x, b.userData.pivot.y, 5, 'rgba(255,255,255,0.5)');
+                if (b.userData.isPendulum) {
+                   renderer.drawLine(b.userData.pivot, b.pos, 'rgba(255,255,255,0.3)', 2);
+                   renderer.drawCircle(b.userData.pivot.x, b.userData.pivot.y, 6, 'rgba(255,255,255,0.5)');
                 }
             }
         }
 
-        // Draw bodies
         for (const body of this.world.bodies) {
-            if (this.params.showTrails) {
-                renderer.drawTrail(body.trail, body.color ? body.color.replace(')', ',0.3)').replace('hsl', 'hsla') : 'rgba(255,255,255,0.2)');
-            }
-            
-            if (body.label && body.label.length > 0 && isNaN(body.label)) {
-                renderer.drawText(body.label, body.pos.x, body.pos.y, {
-                   font: `${body.radius * 2}px Arial`, align: 'center', baseline: 'middle'
-                });
+            if (this.params.showTrails) renderer.drawTrail(body.trail, body.color);
+            if (body.label && isNaN(body.label)) {
+                const off = (body.label === '⛷️') ? -body.radius * 0.2 : 0;
+                renderer.drawText(body.label, body.pos.x, body.pos.y + off, { font: `${body.radius * 2.2}px Arial`, align: 'center', baseline: 'bottom' });
             } else {
                 renderer.drawBody(body, body.color);
             }
-
-            if (this.params.showVectors && body.vel.mag() > 10) {
-                const velEnd = body.pos.add(body.vel.norm().mul(Math.min(body.vel.mag() * 0.2, 50)));
-                renderer.drawArrow(body.pos, velEnd, '#ffd43b', 2, 6);
-            }
         }
 
-        if (this.explosions) {
-            for (const ex of this.explosions) {
-                renderer.drawCircle(ex.x, ex.y, 2 + ex.life * 5, `rgba(255, 146, 43, ${ex.life})`);
-            }
-        }
+        for (const ex of this.explosions) renderer.drawCircle(ex.x, ex.y, 2 + ex.life * 6, `rgba(255, 146, 43, ${ex.life})`);
 
-        // Info
         let totalKE = 0;
         for (const b of this.world.bodies) totalKE += b.kineticEnergy();
-        UI.updateInfo('mech-info', `
-      Corpos: ${this.world.bodies.length}<br>
-      Energia Cinética Total: ${totalKE.toFixed(1)} J<br>
-      Gravidade: ${this.params.gravity} m/s²
-    `);
-
-        UI.setInfoPills([
-            `⚙ Mecânica Clássica`,
-            `🔵 ${this.world.bodies.length} corpos`,
-            `⚡ E = ${totalKE.toFixed(0)} J`,
-        ]);
+        UI.setInfoPills([`⚙ Mecânica`, `🔵 ${this.world.bodies.length} corpos`, `⚡ E = ${totalKE.toFixed(0)} J`]);
     },
 
-    destroy() {
-        this.world.clear();
-        this.dragging = null;
-        this.dragStart = null;
-    }
+    destroy() { this.world.clear(); this.dragging = null; }
 };
