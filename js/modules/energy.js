@@ -15,7 +15,8 @@ const EnergyModule = {
         showEnergy: true,
         friction: 0.005,
         trackType: 'Rampa U',
-        showHeightGrid: false,
+        showHeightGrid: true,
+        objectType: '🛹 Skatista',
     },
     ball: null,
     time: 0,
@@ -35,30 +36,29 @@ const EnergyModule = {
         UI.buildPanel(panel, {
             sections: [
                 {
-                    title: 'Cenário',
+                    title: 'Montanha Russa da Energia',
                     type: 'scenarios',
                     items: [
-                        { label: 'Pista de Velocidade', color: '#ffd43b', active: true, onSelect: () => self.loadScenario('skate') },
-                        { label: 'Queda Livre', color: '#ff6b6b', onSelect: () => self.loadScenario('freefall') },
-                        { label: 'Mola Elástica', color: '#51cf66', onSelect: () => self.loadScenario('spring') },
-                        { label: 'Pêndulo Energético', color: '#845ef7', onSelect: () => self.loadScenario('pendulum_energy') },
+                        { label: '🛹 Skate Park', color: '#ffd43b', active: true, onSelect: () => self.loadScenario('skate') },
+                        { label: '🍎 Maçã de Newton', color: '#ff6b6b', onSelect: () => self.loadScenario('freefall') },
+                        { label: '🏹 Estilingue (Mola)', color: '#51cf66', onSelect: () => self.loadScenario('spring') },
+                        { label: '🏗️ Demolição (Pêndulo)', color: '#845ef7', onSelect: () => self.loadScenario('pendulum_energy') },
                     ]
                 },
                 {
-                    title: 'Parâmetros',
+                    title: 'Física do Objeto',
                     type: 'controls',
                     items: [
-                        { kind: 'select', id: 'en-track', label: 'Formato da Pista', options: ['Rampa U', 'Rampa W', 'Colinas', 'Complexa'], value: self.params.trackType, onChange: v => { self.params.trackType = v; self.loadScenario(self.scenario); } },
-                        { kind: 'slider', id: 'en-gravity', label: 'Gravidade', min: 1, max: 25, step: 0.5, value: self.params.gravity, unit: ' m/s²', onChange: v => { self.params.gravity = v; } },
-                        { kind: 'slider', id: 'en-mass', label: 'Massa', min: 1, max: 20, step: 0.5, value: self.params.mass, unit: ' kg', onChange: v => { self.params.mass = v; } },
-                        { kind: 'slider', id: 'en-friction', label: 'Atrito', min: 0, max: 0.05, step: 0.001, value: self.params.friction, unit: '', onChange: v => { self.params.friction = v; } },
-                        { kind: 'checkbox', id: 'en-show', label: 'Barras de energia', checked: self.params.showEnergy, onChange: v => { self.params.showEnergy = v; } },
-                        { kind: 'checkbox', id: 'en-grid', label: 'Grade de altura', checked: self.params.showHeightGrid, onChange: v => { self.params.showHeightGrid = v; } },
-                        { kind: 'button', id: 'en-reset', label: '↺ Reiniciar', onClick: () => self.loadScenario(self.scenario) },
+                        { kind: 'select', id: 'en-obj', label: 'Escolha o Objeto', options: ['🛹 Skatista', '🍎 Maçã', '⛸️ Patins', '🎾 Bola', '🎳 Boliche'], value: self.params.objectType, onChange: v => { self.params.objectType = v; self.loadScenario(self.scenario); } },
+                        { kind: 'select', id: 'en-track', label: 'Pista', options: ['Rampa U', 'Rampa W', 'Colinas', 'Abismo'], value: self.params.trackType, onChange: v => { self.params.trackType = v; self.loadScenario(self.scenario); } },
+                        { kind: 'slider', id: 'en-mass', label: 'Massa do Objeto (kg)', min: 1, max: 100, step: 1, value: self.params.mass, unit: '', onChange: v => { self.params.mass = v; } },
+                        { kind: 'slider', id: 'en-friction', label: 'Atrito Suave', min: 0, max: 0.1, step: 0.001, value: self.params.friction, unit: '', onChange: v => { self.params.friction = v; } },
+                        { kind: 'checkbox', id: 'en-grid', label: 'Mostrar Grade de Altura', checked: self.params.showHeightGrid, onChange: v => { self.params.showHeightGrid = v; } },
+                        { kind: 'button', id: 'en-reset', label: '↺ Reiniciar Salto', onClick: () => self.loadScenario(self.scenario) },
                     ]
                 },
                 {
-                    title: 'Energia',
+                    title: 'Radar de Energia',
                     type: 'info',
                     id: 'energy-info'
                 }
@@ -73,18 +73,22 @@ const EnergyModule = {
         const w = this.renderer.width;
         const h = this.renderer.height;
 
-        if (name === 'skate' || name === 'rollercoaster') {
-            this.scenario = 'skate';
+        const emojiMap = {
+            '🛹 Skatista': '🛹', '🍎 Maçã': '🍎', '⛸️ Patins': '⛸️', '🎾 Bola': '🎾', '🎳 Boliche': '🎳'
+        };
+        const currentEmoji = emojiMap[this.params.objectType] || '●';
+
+        if (name === 'skate') {
             this.trackPoints = this.generateTrack(w, h, this.params.trackType);
             this.ball = {
-                t: 0, // parameter along track
+                t: 0,
                 speed: 0,
                 pos: this.trackPoints[0].copy(),
                 radius: 12,
-                color: '#ffd43b',
+                label: currentEmoji,
                 trail: [],
             };
-            UI.setHint('Pista de Velocidade — altere o formato da pista e analise a energia.');
+            UI.setHint('🛹 Skate Park — observe a Energia Potencial virar Velocidade!');
         }
 
         if (name === 'freefall') {
@@ -92,11 +96,11 @@ const EnergyModule = {
                 pos: new Vec2(w / 2, 80),
                 vel: new Vec2(0, 0),
                 radius: 15,
-                color: '#ff6b6b',
+                label: currentEmoji,
                 trail: [],
                 groundY: h - 60,
             };
-            UI.setHint('Queda livre — energia potencial → cinética');
+            UI.setHint('🍎 Maçã de Newton — Queda livre e conservação de energia');
         }
 
         if (name === 'spring') {
@@ -107,12 +111,12 @@ const EnergyModule = {
                 restY: h / 2,
                 displacement: 150,
                 radius: 18,
-                color: '#51cf66',
+                label: '🏹',
                 trail: [],
-                k: 2, // spring constant
+                k: 2,
                 phase: 0,
             };
-            UI.setHint('Mola elástica — energia potencial elástica ↔ cinética');
+            UI.setHint('🏹 Estilingue — Energia Potencial Elástica armazenada');
         }
 
         if (name === 'pendulum_energy') {
@@ -126,11 +130,11 @@ const EnergyModule = {
                 length: length,
                 angle: 1.2,
                 angularVel: 0,
-                radius: 16,
-                color: '#845ef7',
+                radius: 20,
+                label: '🏗️',
                 trail: [],
             };
-            UI.setHint('Pêndulo — troca contínua entre EP e EC');
+            UI.setHint('🏗️ Demolição — O movimento periódico do pêndulo');
         }
     },
 
@@ -354,17 +358,23 @@ const EnergyModule = {
             );
         }
 
-        // Draw ball
+        // Draw object (emoji or ball)
         if (this.ball) {
-            // Trail
             if (this.ball.trail.length > 1) {
-                renderer.drawTrail(this.ball.trail, this.ball.color, 1.5);
+                renderer.drawTrail(this.ball.trail, '#ffd43b', 1.5);
             }
-            renderer.drawBody(new Body({
-                pos: this.ball.pos,
-                radius: this.ball.radius,
-                color: this.ball.color,
-            }), this.ball.color);
+            
+            if (this.ball.label) {
+                renderer.drawText(this.ball.label, this.ball.pos.x, this.ball.pos.y, {
+                   font: `${this.ball.radius * 2.2}px Arial`, align: 'center', baseline: 'middle'
+                });
+            } else {
+                renderer.drawBody(new Body({
+                    pos: this.ball.pos,
+                    radius: this.ball.radius,
+                    color: this.ball.color || '#ffd43b',
+                }), this.ball.color || '#ffd43b');
+            }
         }
 
         // Energy bars

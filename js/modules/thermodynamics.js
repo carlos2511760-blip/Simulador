@@ -8,12 +8,13 @@ const ThermodynamicsModule = {
     key: 'thermo',
     renderer: null,
     scenario: 'gas',
+    heatSource: 'none', // 'fire', 'ice', 'none'
     particles: [],
     params: {
         temperature: 300,
         pressure: 1,
-        volume: 1,
-        numParticles: 80,
+        volume: 0.8,
+        numParticles: 60,
         showVelocity: true,
         wallHeat: false,
     },
@@ -24,7 +25,7 @@ const ThermodynamicsModule = {
     containerY: 0,
     pistonY: 0,
     targetPistonY: 0,
-    histogram: new Array(20).fill(0),
+    histogram: new Array(15).fill(0),
 
     init(renderer) {
         this.renderer = renderer;
@@ -37,27 +38,28 @@ const ThermodynamicsModule = {
         UI.buildPanel(panel, {
             sections: [
                 {
-                    title: 'Cenário',
+                    title: 'Cenário Molecular',
                     type: 'scenarios',
                     items: [
-                        { label: 'Gás Ideal', color: '#ff922b', active: true, onSelect: () => self.loadScenario('gas') },
-                        { label: 'Expansão Livre', color: '#ffd43b', onSelect: () => self.loadScenario('expansion') },
-                        { label: 'Condução de Calor', color: '#ff6b6b', onSelect: () => self.loadScenario('conduction') },
+                        { label: '🔥 Motor a Pistão', color: '#ff922b', active: true, onSelect: () => self.loadScenario('gas') },
+                        { label: '🌡️ Troca de Calor', color: '#ff6b6b', onSelect: () => self.loadScenario('conduction') },
+                        { label: '💨 Expansão de Gás', color: '#ffd43b', onSelect: () => self.loadScenario('expansion') },
                     ]
                 },
                 {
-                    title: 'Parâmetros',
+                    title: 'Controle de Energia',
                     type: 'controls',
                     items: [
-                        { kind: 'slider', id: 'th-temp', label: 'Temperatura', min: 50, max: 1000, step: 10, value: self.params.temperature, unit: ' K', onChange: v => { self.params.temperature = v; self.applyTemperature(); } },
-                        { kind: 'slider', id: 'th-particles', label: 'Partículas', min: 20, max: 200, step: 5, value: self.params.numParticles, unit: '', onChange: v => { self.params.numParticles = v; self.loadScenario(self.scenario); } },
-                        { kind: 'slider', id: 'th-volume', label: 'Volume (pistão)', min: 0.3, max: 1, step: 0.05, value: self.params.volume, unit: '', onChange: v => { self.params.volume = v; } },
-                        { kind: 'checkbox', id: 'th-vel', label: 'Colorir por velocidade', checked: true, onChange: v => { self.params.showVelocity = v; } },
-                        { kind: 'button', id: 'th-reset', label: '↺ Reiniciar', onClick: () => self.loadScenario(self.scenario) },
+                        { kind: 'slider', id: 'th-temp', label: 'Temperatura (K)', min: 50, max: 2000, step: 10, value: self.params.temperature, unit: '', onChange: v => { self.params.temperature = v; self.applyTemperature(); } },
+                        { kind: 'slider', id: 'th-volume', label: 'Volume do Pistão', min: 0.2, max: 1, step: 0.05, value: self.params.volume, unit: '', onChange: v => { self.params.volume = v; } },
+                        { kind: 'button', id: 'th-fire', label: '🔥 Ligar Fogo!', onClick: () => { self.heatSource = 'fire'; } },
+                        { kind: 'button', id: 'th-ice', label: '🧊 Usar Gelo!', onClick: () => { self.heatSource = 'ice'; } },
+                        { kind: 'button', id: 'th-off', label: '⏹️ Desligar Fonte', onClick: () => { self.heatSource = 'none'; } },
+                        { kind: 'button', id: 'th-reset', label: '↺ Limpar Gás', onClick: () => self.loadScenario(self.scenario) },
                     ]
                 },
                 {
-                    title: 'Informações',
+                    title: 'Dados em Tempo Real',
                     type: 'info',
                     id: 'thermo-info'
                 }
@@ -134,6 +136,21 @@ const ThermodynamicsModule = {
 
         const cx = this.containerX;
         const cy = this.scenario === 'gas' || this.scenario === 'expansion' ? this.pistonY : this.containerY;
+        
+        // Heat source effect
+        if (this.heatSource !== 'none') {
+            const delta = this.heatSource === 'fire' ? 2 : -2;
+            this.params.temperature = PhysicsUtils.clamp(this.params.temperature + delta, 50, 4000);
+            this.applyTemperature();
+            
+            const slideVal = document.getElementById('val-th-temp');
+            const slideInput = document.getElementById('ctrl-th-temp');
+            if (slideInput && slideVal) {
+                slideInput.value = this.params.temperature;
+                slideVal.textContent = Math.round(this.params.temperature);
+            }
+        }
+
         const cw = this.containerWidth;
         const ch = this.containerY + this.containerHeight - cy;
 
@@ -238,15 +255,32 @@ const ThermodynamicsModule = {
             });
         }
 
-        // Draw particles
+        // Draw particles with glow
         for (const p of this.particles) {
-            let color = '#ff922b';
-            if (this.params.showVelocity) {
-                const speed = Math.sqrt(p.vx * p.vx + p.vy * p.vy);
-                const hue = PhysicsUtils.clamp(240 - speed * 2, 0, 240); // blue=slow, red=fast
-                color = `hsl(${hue}, 80%, 55%)`;
-            }
+            const speed = Math.sqrt(p.vx * p.vx + p.vy * p.vy);
+            const hue = PhysicsUtils.clamp(230 - speed * 1.8, 0, 240);
+            const color = `hsl(${hue}, 90%, 60%)`;
+            
             renderer.drawCircle(p.x, p.y, p.radius, color);
+            // Dynamic glow for fast particles
+            if (speed > 180) {
+                ctx.save();
+                ctx.globalAlpha = 0.2;
+                renderer.drawCircle(p.x, p.y, p.radius * 2.5, color);
+                ctx.restore();
+            }
+        }
+
+        // Animated Heat Source
+        if (this.heatSource !== 'none') {
+            const bottomY = cy + ch;
+            const emoji = this.heatSource === 'fire' ? '🔥' : '🧊';
+            const count = this.heatSource === 'fire' ? 8 : 6;
+            for(let i=0; i<count; i++) {
+                const ex = cx + (cw / count) * i + (Math.sin(this.time*3 + i)*10);
+                const ey = bottomY + 25 + (Math.cos(this.time*2 + i)*5);
+                renderer.drawText(emoji, ex, ey, { font: '24px Arial', align: 'center'});
+            }
         }
 
         // Speed distribution histogram

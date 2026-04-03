@@ -9,8 +9,8 @@ const WavesModule = {
     renderer: null,
     scenario: 'transverse',
     params: {
-        frequency: 2,
-        amplitude: 60,
+        frequency: 1,
+        amplitude: 50,
         wavelength: 200,
         speed: 100,
         showEnvelope: false,
@@ -31,28 +31,28 @@ const WavesModule = {
         UI.buildPanel(panel, {
             sections: [
                 {
-                    title: 'Cenário',
+                    title: 'Tipos de Ondas',
                     type: 'scenarios',
                     items: [
-                        { label: 'Onda Transversal', color: '#22b8cf', active: true, onSelect: () => self.loadScenario('transverse') },
-                        { label: 'Onda Longitudinal', color: '#845ef7', onSelect: () => self.loadScenario('longitudinal') },
-                        { label: 'Interferência', color: '#51cf66', onSelect: () => self.loadScenario('interference') },
-                        { label: 'Ondas Estacionárias', color: '#ffd43b', onSelect: () => self.loadScenario('standing') },
+                        { label: '⛵ No Mar (Transv.)', color: '#22b8cf', active: true, onSelect: () => self.loadScenario('transverse') },
+                        { label: '🔊 Som (Longit.)', color: '#845ef7', onSelect: () => self.loadScenario('longitudinal') },
+                        { label: '🎸 Corda de Violão', color: '#ffd43b', onSelect: () => self.loadScenario('standing') },
+                        { label: '💧 Gotas no Lago', color: '#51cf66', onSelect: () => self.loadScenario('interference') },
                     ]
                 },
                 {
-                    title: 'Parâmetros',
+                    title: 'Ajuste da Vibração',
                     type: 'controls',
                     items: [
-                        { kind: 'slider', id: 'wav-freq', label: 'Frequência', min: 0.5, max: 8, step: 0.1, value: self.params.frequency, unit: ' Hz', onChange: v => { self.params.frequency = v; } },
-                        { kind: 'slider', id: 'wav-amp', label: 'Amplitude', min: 10, max: 120, step: 5, value: self.params.amplitude, unit: ' px', onChange: v => { self.params.amplitude = v; } },
-                        { kind: 'slider', id: 'wav-wl', label: 'Comprimento de Onda', min: 60, max: 400, step: 10, value: self.params.wavelength, unit: ' px', onChange: v => { self.params.wavelength = v; } },
-                        { kind: 'slider', id: 'wav-damp', label: 'Amortecimento', min: 0, max: 0.01, step: 0.001, value: self.params.damping, unit: '', onChange: v => { self.params.damping = v; } },
-                        { kind: 'checkbox', id: 'wav-env', label: 'Mostrar envelope', checked: false, onChange: v => { self.params.showEnvelope = v; } },
+                        { kind: 'slider', id: 'wav-freq', label: 'Frequência (Hz)', min: 0.2, max: 10, step: 0.1, value: self.params.frequency, unit: '', onChange: v => { self.params.frequency = v; } },
+                        { kind: 'slider', id: 'wav-amp', label: 'Amplitude (Energia)', min: 5, max: 150, step: 5, value: self.params.amplitude, unit: '', onChange: v => { self.params.amplitude = v; } },
+                        { kind: 'slider', id: 'wav-wl', label: 'Comprimento (λ)', min: 100, max: 500, step: 10, value: self.params.wavelength, unit: ' m', onChange: v => { self.params.wavelength = v; } },
+                        { kind: 'slider', id: 'wav-damp', label: 'Amortecimento', min: 0, max: 0.02, step: 0.001, value: self.params.damping, unit: '', onChange: v => { self.params.damping = v; } },
+                        { kind: 'button', id: 'wav-reset', label: '↺ Reiniciar Pulso', onClick: () => { self.time = 0; } },
                     ]
                 },
                 {
-                    title: 'Informações',
+                    title: 'Análise da Onda',
                     type: 'info',
                     id: 'waves-info'
                 }
@@ -68,20 +68,20 @@ const WavesModule = {
         const h = this.renderer.height;
 
         if (name === 'transverse') {
-            UI.setHint('Onda transversal — partículas oscilam perpendicularmente à propagação');
+            UI.setHint('⛵ No Mar — as ondas sobem e descem (perpendicular)');
         }
         if (name === 'longitudinal') {
-            UI.setHint('Onda longitudinal — partículas oscilam na direção da propagação');
+            UI.setHint('🔊 Som — a vibração empurra o ar (longitudinal)');
         }
         if (name === 'interference') {
             this.sources = [
-                { x: w * 0.3, y: h * 0.5 },
-                { x: w * 0.7, y: h * 0.5 },
+                { x: w * 0.35, y: h * 0.5, emoji: '💧' },
+                { x: w * 0.65, y: h * 0.5, emoji: '💧' },
             ];
-            UI.setHint('Interferência — duas fontes criando padrão de interferência');
+            UI.setHint('💧 Gotas no Lago — padrões de construtividade e anulação');
         }
         if (name === 'standing') {
-            UI.setHint('Onda estacionária — nós e antinós em destaque');
+            UI.setHint('🎸 Cordas — nós não se movem, ventres vibram muito');
         }
     },
 
@@ -142,14 +142,23 @@ const WavesModule = {
                 ctx.setLineDash([]);
             }
 
+            // Draw boat emoji
+            const bx = w * 0.5;
+            const bDamp = Math.exp(-damping * bx);
+            const by = cy + amplitude * bDamp * Math.sin(k * bx - omega * t);
+            const bAngle = Math.atan(amplitude * bDamp * k * Math.cos(k * bx - omega * t));
+            
+            ctx.save();
+            ctx.translate(bx, by);
+            ctx.rotate(bAngle);
+            renderer.drawText('⛵', 0, -15, { font: '32px Arial', align: 'center'});
+            ctx.restore();
+
             // Draw particles on wave
-            for (let x = 30; x < w; x += 25) {
+            for (let x = 30; x < w; x += 30) {
                 const dampFactor = Math.exp(-damping * x);
                 const y = cy + amplitude * dampFactor * Math.sin(k * x - omega * t);
-                renderer.drawCircle(x, y, 4, '#22b8cf');
-                // Velocity arrow (vertical)
-                const vy = -amplitude * dampFactor * omega * Math.cos(k * x - omega * t);
-                renderer.drawLine(new Vec2(x, y), new Vec2(x, y + vy * 0.15), 'rgba(255,107,107,0.5)', 1);
+                renderer.drawCircle(x, y, 3.5, '#22b8cf');
             }
 
             // Wavelength indicator
@@ -160,30 +169,18 @@ const WavesModule = {
         }
 
         if (this.scenario === 'longitudinal') {
-            const cy = h / 2;
-            const numParticles = 60;
-            const spacing = w / numParticles;
+            renderer.drawText('🔊', 30, cy, { font: '40px Arial', align: 'center', baseline: 'middle'});
 
             for (let i = 0; i < numParticles; i++) {
-                const baseX = i * spacing + spacing / 2;
-                const displacement = amplitude * 0.5 * Math.sin(k * baseX - omega * t);
+                const baseX = 80 + i * spacing;
+                const displacement = amplitude * 0.6 * Math.sin(k * baseX - omega * t);
                 const x = baseX + displacement;
 
-                // Color by density (compression vs rarefaction)
-                const compressionFactor = -amplitude * 0.5 * k * Math.cos(k * baseX - omega * t);
-                const intensity = PhysicsUtils.clamp(0.3 - compressionFactor * 0.003, 0.1, 0.8);
-                const hue = compressionFactor > 0 ? 200 : 20;
+                const compressionFactor = -amplitude * 0.6 * k * Math.cos(k * baseX - omega * t);
+                const intensity = PhysicsUtils.clamp(0.4 - compressionFactor * 0.002, 0.1, 0.9);
+                const color = `hsla(200, 80%, 60%, ${intensity})`;
 
-                renderer.drawCircle(x, cy, 5, `hsla(${hue}, 70%, 55%, ${intensity})`);
-
-                // Draw displacement arrows
-                if (Math.abs(displacement) > 2) {
-                    renderer.drawLine(
-                        new Vec2(baseX, cy + 20),
-                        new Vec2(x, cy + 20),
-                        'rgba(132,94,247,0.4)', 1
-                    );
-                }
+                renderer.drawCircle(x, cy, 5, color);
             }
 
             renderer.drawText('Compressão', w * 0.3, cy - 60, { color: 'rgba(34,184,207,0.5)', font: '11px Inter', align: 'center' });
@@ -211,8 +208,8 @@ const WavesModule = {
 
             // Draw sources
             for (const src of this.sources) {
-                renderer.drawCircle(src.x, src.y, 8, '#22b8cf');
-                renderer.drawCircle(src.x, src.y, 20 + Math.sin(t * omega) * 5, 'rgba(34,184,207,0.3)', false, 1.5);
+                renderer.drawText(src.emoji, src.x, src.y, { font: '28px Arial', align: 'center', baseline: 'middle'});
+                renderer.drawCircle(src.x, src.y, 25 + Math.sin(t * omega) * 8, 'rgba(51,154,240,0.2)', false, 2);
             }
         }
 

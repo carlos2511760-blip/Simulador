@@ -10,14 +10,12 @@ const MaterialsModule = {
     world: null,
     scenario: 'deformation',
     params: {
-        stiffness: 0.5,
-        friction: 0.1,
-        structuralIntegrity: 0.8,
+        stiffness: 0.6,
+        friction: 0.2,
+        structuralIntegrity: 0.7,
         showStress: true,
         gravity: 9.8,
     },
-    nodes: [],
-    constraints: [],
     time: 0,
     dragging: null,
 
@@ -33,28 +31,28 @@ const MaterialsModule = {
         UI.buildPanel(panel, {
             sections: [
                 {
-                    title: 'Cenário',
+                    title: 'Resistência de Coisas',
                     type: 'scenarios',
                     items: [
-                        { label: 'Deformação (Soft Body)', color: '#e599f7', active: true, onSelect: () => self.loadScenario('deformation') },
-                        { label: 'Atrito Realista', color: '#ff922b', onSelect: () => self.loadScenario('friction') },
-                        { label: 'Fratura de Estrutura', color: '#ff6b6b', onSelect: () => self.loadScenario('fracture') },
-                        { label: 'Ponte de Treliça', color: '#51cf66', onSelect: () => self.loadScenario('bridge') },
+                        { label: '🍮 Gelatina Dançante', color: '#e599f7', active: true, onSelect: () => self.loadScenario('deformation') },
+                        { label: '🧱 Parede de Tijolos', color: '#ff6b6b', onSelect: () => self.loadScenario('fracture') },
+                        { label: '🪵 Ponte de Madeira', color: '#51cf66', onSelect: () => self.loadScenario('bridge') },
+                        { label: '🚜 Teste de Atrito', color: '#ff922b', onSelect: () => self.loadScenario('friction') },
                     ]
                 },
                 {
-                    title: 'Parâmetros',
+                    title: 'Engenharia',
                     type: 'controls',
                     items: [
-                        { kind: 'slider', id: 'mat-stiff', label: 'Rigidez', min: 0.01, max: 1.0, step: 0.05, value: self.params.stiffness, unit: '', onChange: v => { self.params.stiffness = v; self.updateStiffness(); } },
-                        { kind: 'slider', id: 'mat-fric', label: 'Atrito', min: 0, max: 1, step: 0.05, value: self.params.friction, unit: '', onChange: v => { self.params.friction = v; } },
-                        { kind: 'slider', id: 'mat-integ', label: 'Integridade', min: 0.1, max: 1.0, step: 0.1, value: self.params.structuralIntegrity, unit: '', onChange: v => { self.params.structuralIntegrity = v; } },
-                        { kind: 'checkbox', id: 'mat-stress', label: 'Mostrar tensão', checked: true, onChange: v => { self.params.showStress = v; } },
-                        { kind: 'button', id: 'mat-reset', label: '↺ Reiniciar', onClick: () => self.loadScenario(self.scenario) },
+                        { kind: 'slider', id: 'mat-stiff', label: 'Elasticidade (K)', min: 0.05, max: 1.0, step: 0.05, value: self.params.stiffness, unit: '', onChange: v => { self.params.stiffness = v; self.updateStiffness(); } },
+                        { kind: 'slider', id: 'mat-integ', label: 'Resistência Final', min: 0.1, max: 2.0, step: 0.1, value: self.params.structuralIntegrity, unit: '', onChange: v => { self.params.structuralIntegrity = v; } },
+                        { kind: 'slider', id: 'mat-fric', label: 'Atrito do Chão', min: 0, max: 1, step: 0.05, value: self.params.friction, unit: '', onChange: v => { self.params.friction = v; } },
+                        { kind: 'checkbox', id: 'mat-stress', label: 'Mapa de Tensão', checked: true, onChange: v => { self.params.showStress = v; } },
+                        { kind: 'button', id: 'mat-reset', label: '↺ Reconstruir Tudo', onClick: () => self.loadScenario(self.scenario) },
                     ]
                 },
                 {
-                    title: 'Informações',
+                    title: 'Relatório de Ruptura',
                     type: 'info',
                     id: 'materials-info'
                 }
@@ -71,20 +69,13 @@ const MaterialsModule = {
         const h = this.renderer.height;
 
         if (name === 'deformation') {
-            // Create a jell-o cube
             const size = 5;
-            const spacing = 35;
+            const spacing = 40;
             const startX = w / 2 - (size * spacing) / 2;
             const startY = h / 2 - (size * spacing) / 2;
 
             for (let y = 0; y < size; y++) {
                 for (let x = 0; x < size; x++) {
-                    this.nodes.push({
-                        pos: new Vec2(startX + x * spacing, startY + y * spacing),
-                        oldPos: new Vec2(startX + x * spacing, startY + y * spacing),
-                        fixed: false,
-                        radius: 4,
-                    });
                 }
             }
 
@@ -285,22 +276,23 @@ const MaterialsModule = {
         for (const c of this.constraints) {
             const n1 = this.nodes[c.a];
             const n2 = this.nodes[c.b];
-            let color = 'rgba(255,255,255,0.2)';
+            let color = 'rgba(255,255,255,0.3)';
 
             if (this.params.showStress) {
-                const stressVal = Math.min(c.stress * 4, 1);
-                color = `rgba(${255 * stressVal}, ${255 * (1 - stressVal)}, ${255 * (1 - stressVal)}, 0.6)`;
+                const stressVal = Math.min(c.stress * 5 / this.params.structuralIntegrity, 1);
+                // Green (safe) to Red (about to break)
+                color = `rgba(${Math.floor(255 * stressVal)}, ${Math.floor(255 * (1 - stressVal))}, 50, 0.8)`;
             }
-
-            renderer.drawLine(n1.pos, n2.pos, color, 2);
+            renderer.drawLine(n1.pos, n2.pos, color, 3);
         }
 
         // Draw nodes
         for (const n of this.nodes) {
-            const color = n.fixed ? '#e599f7' : (n.color || 'rgba(255,255,255,0.6)');
-            renderer.drawCircle(n.pos.x, n.pos.y, n.radius || 4, color);
-            if (n.label) {
-                renderer.drawText(n.label, n.pos.x, n.pos.y - 15, { align: 'center', font: '10px Inter' });
+            if (n.label && n.label.length > 0) {
+                renderer.drawText(n.label, n.pos.x, n.pos.y, { align: 'center', baseline: 'middle', font: '18px Arial' });
+            } else {
+                const color = n.fixed ? '#e599f7' : (n.color || 'rgba(255,255,255,0.8)');
+                renderer.drawCircle(n.pos.x, n.pos.y, n.radius || 4, color);
             }
         }
 

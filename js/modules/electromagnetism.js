@@ -9,8 +9,9 @@ const ElectromagnetismModule = {
     renderer: null,
     scenario: 'charges',
     charges: [],
+    magnets: [],
     params: {
-        k: 2000,
+        k: 9000,
         showField: true,
         showLines: true,
         fieldResolution: 30,
@@ -31,30 +32,29 @@ const ElectromagnetismModule = {
         UI.buildPanel(panel, {
             sections: [
                 {
-                    title: 'Cenário',
+                    title: 'Fenômenos Invisíveis',
                     type: 'scenarios',
                     items: [
-                        { label: 'Cargas Elétricas', color: '#51cf66', active: true, onSelect: () => self.loadScenario('charges') },
-                        { label: 'Dipolo', color: '#339af0', onSelect: () => self.loadScenario('dipole') },
-                        { label: 'Capacitor', color: '#ffd43b', onSelect: () => self.loadScenario('capacitor') },
-                        { label: 'Campo Magnético', color: '#845ef7', onSelect: () => self.loadScenario('magnetic') },
+                        { label: '⚛️ Cargas Ativas', color: '#51cf66', active: true, onSelect: () => self.loadScenario('charges') },
+                        { label: '🧲 Grande Ímã', color: '#845ef7', onSelect: () => self.loadScenario('magnetic') },
+                        { label: '🔋 Capacitor Real', color: '#ffd43b', onSelect: () => self.loadScenario('capacitor') },
+                        { label: '⚖️ Balança de Coulomb', color: '#339af0', onSelect: () => self.loadScenario('dipole') },
                     ]
                 },
                 {
-                    title: 'Parâmetros',
+                    title: 'Ferramentas de Carga',
                     type: 'controls',
                     items: [
-                        { kind: 'slider', id: 'em-k', label: 'Constante k', min: 500, max: 5000, step: 100, value: self.params.k, unit: '', onChange: v => { self.params.k = v; } },
-                        { kind: 'slider', id: 'em-res', label: 'Resolução do campo', min: 15, max: 50, step: 5, value: self.params.fieldResolution, unit: ' px', onChange: v => { self.params.fieldResolution = v; } },
-                        { kind: 'checkbox', id: 'em-field', label: 'Vetores do campo', checked: true, onChange: v => { self.params.showField = v; } },
-                        { kind: 'checkbox', id: 'em-lines', label: 'Linhas de campo', checked: true, onChange: v => { self.params.showLines = v; } },
-                        { kind: 'checkbox', id: 'em-pot', label: 'Mapa de potencial', checked: false, onChange: v => { self.params.showPotential = v; } },
-                        { kind: 'button', id: 'em-pos', label: '➕ Adicionar carga +', onClick: () => self.addCharge(1) },
-                        { kind: 'button', id: 'em-neg', label: '➖ Adicionar carga −', onClick: () => self.addCharge(-1) },
+                        { kind: 'slider', id: 'em-k', label: 'Poder Elétrico (k)', min: 1000, max: 20000, step: 500, value: self.params.k, unit: '', onChange: v => { self.params.k = v; } },
+                        { kind: 'checkbox', id: 'em-lines', label: 'Ver Linhas de Força', checked: true, onChange: v => { self.params.showLines = v; } },
+                        { kind: 'checkbox', id: 'em-pot', label: 'Mapa de Energia (Volt)', checked: false, onChange: v => { self.params.showPotential = v; } },
+                        { kind: 'button', id: 'em-pos', label: '➕ Criar Carga Positiva', onClick: () => self.addCharge(1) },
+                        { kind: 'button', id: 'em-neg', label: '➖ Criar Carga Negativa', onClick: () => self.addCharge(-1) },
+                        { kind: 'button', id: 'em-clear', label: '🗑️ Descarregar Tudo', onClick: () => { self.charges = []; self.magnets = []; } },
                     ]
                 },
                 {
-                    title: 'Informações',
+                    title: 'Monitor de Campo',
                     type: 'info',
                     id: 'electro-info'
                 }
@@ -96,23 +96,13 @@ const ElectromagnetismModule = {
         }
 
         if (name === 'magnetic') {
-            // Simulate magnetic field with moving charges
-            this.charges.push({ x: cx, y: cy, q: 5, radius: 16, fixed: true });
-            // Test charges that will orbit
-            for (let i = 0; i < 12; i++) {
-                const angle = (i / 12) * Math.PI * 2;
-                const dist = 80 + i * 15;
-                this.charges.push({
-                    x: cx + Math.cos(angle) * dist,
-                    y: cy + Math.sin(angle) * dist,
-                    q: 0.1,
-                    radius: 3,
-                    fixed: false,
-                    vx: -Math.sin(angle) * 80,
-                    vy: Math.cos(angle) * 80,
-                });
-            }
-            UI.setHint('Campo magnético — partículas carregadas em movimento circular');
+            this.magnets = [{ x: cx, y: cy, w: 140, h: 40 }];
+            
+            // Populate with dipole fields logic for the magnet ends
+            this.charges.push({ x: cx - 50, y: cy, q: 6, radius: 15, fixed: true, hidden: true });
+            this.charges.push({ x: cx + 50, y: cy, q: -6, radius: 15, fixed: true, hidden: true });
+            
+            UI.setHint('Magnetismo — Ímãs têm polos Norte e Sul inseparáveis');
         }
     },
 
@@ -285,30 +275,33 @@ const ElectromagnetismModule = {
             }
         }
 
+        // Draw magnets
+        for (const m of this.magnets || []) {
+            ctx.fillStyle = '#ff6b6b';
+            ctx.fillRect(m.x - m.w/2, m.y - m.h/2, m.w/2, m.h);
+            ctx.fillStyle = '#339af0';
+            ctx.fillRect(m.x, m.y - m.h/2, m.w/2, m.h);
+            ctx.strokeStyle = 'white';
+            ctx.lineWidth = 1.5;
+            ctx.strokeRect(m.x - m.w/2, m.y - m.h/2, m.w, m.h);
+            renderer.drawText('N', m.x - m.w * 0.25, m.y, { color: '#fff', font: 'bold 16px Inter', align: 'center', baseline: 'middle'});
+            renderer.drawText('S', m.x + m.w * 0.25, m.y, { color: '#fff', font: 'bold 16px Inter', align: 'center', baseline: 'middle'});
+        }
+
         // Draw charges
         for (const c of this.charges) {
-            if (c.radius < 5) {
-                // Small moving charge
-                renderer.drawCircle(c.x, c.y, c.radius, 'rgba(34,184,207,0.7)');
-                continue;
-            }
+            if (c.hidden) continue;
+            
             const isPositive = c.q > 0;
-            const color = isPositive ? '#ff6b6b' : '#339af0';
+            const emoji = isPositive ? '➕' : '➖';
+            const color = isPositive ? 'rgba(255,107,107,0.2)' : 'rgba(51,154,240,0.2)';
 
-            // Glow
-            renderer.drawGradientCircle(c.x, c.y, c.radius * 3,
-                isPositive ? 'rgba(255,107,107,0.15)' : 'rgba(51,154,240,0.15)',
-                'transparent'
-            );
-
-            renderer.drawCircle(c.x, c.y, c.radius, color);
-
-            // + or - symbol
-            ctx.fillStyle = '#fff';
-            ctx.font = `bold ${c.radius}px Inter`;
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
-            ctx.fillText(isPositive ? '+' : '−', c.x, c.y);
+            renderer.drawGradientCircle(c.x, c.y, c.radius * 3, color, 'transparent');
+            renderer.drawCircle(c.x, c.y, c.radius, isPositive ? '#ff6b6b' : '#339af0');
+            renderer.drawText(emoji, c.x, c.y + 1, { font: 'bold 14px Arial', align: 'center', baseline: 'middle', color: '#fff' });
+            
+            const qVal = `${c.q.toFixed(1)} nC`;
+            renderer.drawText(qVal, c.x, c.y - c.radius - 8, { font: '10px JetBrains Mono', color: 'rgba(255,255,255,0.6)', align: 'center'});
         }
 
         // Info

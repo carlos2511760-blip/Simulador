@@ -8,25 +8,25 @@
 /* ---- CSS Custom Properties ---- */
 :root {
   /* Base palette */
-  --bg-primary: #0a0a0f;
-  --bg-secondary: #12121a;
-  --bg-tertiary: #1a1a2e;
-  --bg-card: rgba(22, 22, 35, 0.7);
-  --bg-glass: rgba(255, 255, 255, 0.03);
-  --border-glass: rgba(255, 255, 255, 0.08);
-  --text-primary: #f0f0f5;
-  --text-secondary: #a0a0b8;
-  --text-muted: #6b6b80;
+  --bg-primary: #050508;
+  --bg-secondary: #0a0a14;
+  --bg-tertiary: #101020;
+  --bg-card: rgba(15, 15, 25, 0.75);
+  --bg-glass: rgba(255, 255, 255, 0.04);
+  --border-glass: rgba(255, 255, 255, 0.1);
+  --text-primary: #ffffff;
+  --text-secondary: #b0b0cc;
+  --text-muted: #707090;
 
-  /* Module accent colors */
-  --color-mechanics: #ff6b6b;
-  --color-gravity: #845ef7;
-  --color-energy: #ffd43b;
-  --color-thermo: #ff922b;
-  --color-waves: #22b8cf;
-  --color-electro: #51cf66;
-  --color-fluids: #339af0;
-  --color-materials: #e599f7;
+  /* Neon Module Colors */
+  --color-mechanics: #ff3e3e;
+  --color-gravity: #9d7cff;
+  --color-energy: #ffd93d;
+  --color-thermo: #ff9f43;
+  --color-waves: #00d2ff;
+  --color-electro: #2ecc71;
+  --color-fluids: #3498db;
+  --color-materials: #f368e0;
 
   /* Gradients */
   --gradient-mechanics: linear-gradient(135deg, #ff6b6b, #ee5a24);
@@ -168,15 +168,17 @@ canvas {
 }
 
 .hero h1 {
-  font-size: clamp(2.5rem, 6vw, 4.5rem);
+  font-size: clamp(3rem, 10vw, 6rem);
   font-weight: 900;
-  letter-spacing: -0.03em;
-  background: linear-gradient(135deg, #f0f0f5 0%, #845ef7 50%, #22b8cf 100%);
+  letter-spacing: -0.05em;
+  line-height: 0.9;
+  background: linear-gradient(135deg, #fff 0%, #00d2ff 50%, #9d7cff 100%);
   background-clip: text;
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   margin-bottom: var(--space-md);
-  animation: fadeInUp 0.6s ease 0.1s both;
+  filter: drop-shadow(0 0 20px rgba(0, 210, 255, 0.3));
+  animation: fadeInUp 0.8s cubic-bezier(0.2, 0.8, 0.2, 1) both;
   position: relative;
   z-index: 1;
 }
@@ -228,13 +230,19 @@ canvas {
   position: relative;
   background: var(--bg-card);
   border: 1px solid var(--border-glass);
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius-xl);
   padding: var(--space-xl);
   cursor: pointer;
-  transition: all var(--transition-base);
+  transition: all 0.4s cubic-bezier(0.2, 0.8, 0.2, 1);
   overflow: hidden;
-  backdrop-filter: blur(10px);
+  backdrop-filter: blur(20px);
   animation: fadeInUp 0.5s ease both;
+}
+
+.module-card:hover {
+  transform: translateY(-8px) scale(1.02);
+  border-color: rgba(255,255,255,0.2);
+  box-shadow: 0 20px 40px rgba(0,0,0,0.4), 0 0 20px rgba(255,255,255,0.05);
 }
 
 .module-card:nth-child(1) { animation-delay: 0.35s; }

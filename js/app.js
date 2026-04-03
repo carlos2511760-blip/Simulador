@@ -70,16 +70,30 @@ const App = {
         const drawStars = () => {
             if (document.getElementById('landing-page').classList.contains('hidden')) return;
             ctx.clearRect(0, 0, w, h);
-            ctx.fillStyle = '#fff';
+            
+            // Nebula Background
+            const time = Date.now() * 0.0005;
+            const grad = ctx.createRadialGradient(w/2, h/2, 0, w/2, h/2, w*0.8);
+            grad.addColorStop(0, '#0a0a20');
+            grad.addColorStop(0.5, '#050510');
+            grad.addColorStop(1, '#020205');
+            ctx.fillStyle = grad;
+            ctx.fillRect(0, 0, w, h);
+
             for (const s of stars) {
-                ctx.globalAlpha = 0.2 + Math.abs(Math.sin(Date.now() * 0.001 * s.speed)) * 0.4;
+                const flicker = 0.2 + Math.abs(Math.sin(time * s.speed * 20)) * 0.6;
+                ctx.globalAlpha = flicker;
+                ctx.fillStyle = '#fff';
                 ctx.beginPath();
                 ctx.arc(s.x, s.y, s.size, 0, Math.PI * 2);
                 ctx.fill();
 
                 // Slow drift
-                s.y -= s.speed * 0.2;
-                if (s.y < 0) s.y = h;
+                s.y -= s.speed * 0.3;
+                if (s.y < 0) {
+                    s.y = h;
+                    s.x = Math.random() * w;
+                }
             }
             requestAnimationFrame(drawStars);
         };

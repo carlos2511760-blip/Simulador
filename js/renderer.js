@@ -54,10 +54,11 @@ class Renderer {
         if (glowColor) {
             ctx.save();
             ctx.shadowColor = glowColor;
-            ctx.shadowBlur = radius * 2;
+            ctx.shadowBlur = radius * 3;
             ctx.beginPath();
             ctx.arc(pos.x, pos.y, radius, 0, Math.PI * 2);
             ctx.fillStyle = glowColor;
+            ctx.globalAlpha = 0.4;
             ctx.fill();
             ctx.restore();
         }
