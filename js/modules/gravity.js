@@ -7,6 +7,7 @@ const GravityModule = {
     name: 'Gravidade e Órbitas',
     key: 'gravity',
     bodies: [],
+    explosions: [],
     renderer: null,
     scenario: 'solar',
     params: {
@@ -75,16 +76,16 @@ const GravityModule = {
             // Sun
             this.bodies.push(new Body({
                 pos: new Vec2(cx, cy), vel: new Vec2(0, 0),
-                mass: 500, radius: 28, color: '#ffd43b', label: 'Sol', fixed: true, maxTrail: 0,
+                mass: 500, radius: 28, color: '#ffd43b', label: '☀️', fixed: true, maxTrail: 0,
             }));
             // Planets
             const planets = [
-                { dist: 80, mass: 3, r: 6, color: '#adb5bd', label: 'Mercúrio', speed: 3.8 },
-                { dist: 120, mass: 8, r: 8, color: '#ff922b', label: 'Vênus', speed: 3.1 },
-                { dist: 170, mass: 10, r: 9, color: '#339af0', label: 'Terra', speed: 2.6 },
-                { dist: 220, mass: 6, r: 7, color: '#ff6b6b', label: 'Marte', speed: 2.2 },
-                { dist: 310, mass: 60, r: 16, color: '#e8590c', label: 'Júpiter', speed: 1.5 },
-                { dist: 390, mass: 40, r: 14, color: '#fcc419', label: 'Saturno', speed: 1.2 },
+                { dist: 80, mass: 3, r: 6, color: '#adb5bd', label: '🌑', speed: 3.8 },
+                { dist: 120, mass: 8, r: 8, color: '#ff922b', label: '🌕', speed: 3.1 },
+                { dist: 170, mass: 10, r: 9, color: '#339af0', label: '🌍', speed: 2.6 },
+                { dist: 220, mass: 6, r: 7, color: '#ff6b6b', label: '🔴', speed: 2.2 },
+                { dist: 310, mass: 60, r: 16, color: '#e8590c', label: '🪐', speed: 1.5 },
+                { dist: 390, mass: 40, r: 14, color: '#fcc419', label: '⭐', speed: 1.2 },
             ];
             for (const p of planets) {
                 const angle = Math.random() * Math.PI * 2;
@@ -103,16 +104,16 @@ const GravityModule = {
             const speed = Math.sqrt(this.params.G * 100 / (dist * 2));
             this.bodies.push(new Body({
                 pos: new Vec2(cx - dist, cy), vel: new Vec2(0, speed),
-                mass: 100, radius: 20, color: '#339af0', label: 'Estrela A', maxTrail: 200,
+                mass: 100, radius: 20, color: '#339af0', label: '🔵', maxTrail: 200,
             }));
             this.bodies.push(new Body({
                 pos: new Vec2(cx + dist, cy), vel: new Vec2(0, -speed),
-                mass: 100, radius: 20, color: '#ff6b6b', label: 'Estrela B', maxTrail: 200,
+                mass: 100, radius: 20, color: '#ff6b6b', label: '🔴', maxTrail: 200,
             }));
             // small orbiting planet
             this.bodies.push(new Body({
                 pos: new Vec2(cx, cy - 250), vel: new Vec2(speed * 1.8, 0),
-                mass: 2, radius: 5, color: '#51cf66', label: 'Planeta', maxTrail: 400,
+                mass: 2, radius: 5, color: '#51cf66', label: '🌍', maxTrail: 400,
             }));
             UI.setHint('Sistema binário — duas estrelas orbitando mutuamente');
         }
@@ -238,6 +239,16 @@ const GravityModule = {
                     const a = this.bodies[i];
                     const b = this.bodies[j];
                     if (a.pos.dist(b.pos) < (a.radius + b.radius) * 0.6) {
+                        for(let k=0; k<15; k++) {
+                            this.explosions.push({
+                                x: b.pos.x, y: b.pos.y,
+                                vx: (Math.random()-0.5) * 100 + a.vel.x,
+                                vy: (Math.random()-0.5) * 100 + a.vel.y,
+                                color: b.color,
+                                life: 1.0
+                            });
+                        }
+                        
                         // Merge b into a
                         const totalMass = a.mass + b.mass;
                         a.vel = a.vel.mul(a.mass / totalMass).add(b.vel.mul(b.mass / totalMass));
@@ -247,6 +258,16 @@ const GravityModule = {
                         j--;
                     }
                 }
+            }
+        }
+        
+        if (this.explosions) {
+            for (let i = this.explosions.length - 1; i >= 0; i--) {
+                const ex = this.explosions[i];
+                ex.x += ex.vx * dt;
+                ex.y += ex.vy * dt;
+                ex.life -= dt * 2.0;
+                if (ex.life <= 0) this.explosions.splice(i, 1);
             }
         }
     },
@@ -297,7 +318,25 @@ const GravityModule = {
                     'transparent'
                 );
             }
+            
+            const origLabel = body.label;
+            if (['☀️','🌍','🪐','🌕','🌑','🔴','⭐','🔵','☄️'].includes(body.label)) {
+                body.label = ''; // Hide normal rendering text
+            }
             renderer.drawBody(body, body.color);
+            body.label = origLabel;
+
+            if (['☀️','🌍','🪐','🌕','🌑','🔴','⭐','🔵','☄️'].includes(body.label)) {
+                renderer.drawText(body.label, body.pos.x, body.pos.y, {
+                   font: `${Math.max(body.radius * 1.5, 12)}px Arial`, align: 'center', baseline: 'middle'
+                });
+            }
+        }
+        
+        if (this.explosions) {
+            for (const ex of this.explosions) {
+                renderer.drawCircle(ex.x, ex.y, 2 + ex.life * 4, ex.color.replace(')', `,${ex.life})`).replace('hsl', 'hsla').replace(/#[0-9a-fA-F]{6}/, (c) => `rgba(${parseInt(c.slice(1,3),16)},${parseInt(c.slice(3,5),16)},${parseInt(c.slice(5,7),16)},${ex.life})`));
+            }
         }
 
         // Info
