@@ -309,21 +309,31 @@ class Renderer {
             if (series.fill) {
                 ctx.lineTo(graphX + (series.data.length - 1) * stepX, graphY + graphH);
                 ctx.lineTo(graphX, graphY + graphH);
-                ctx.fillStyle = series.color.replace('rgb', 'rgba').replace('hsl', 'hsla').replace(')', ',0.15)');
+                ctx.globalAlpha = 0.15;
+                ctx.fillStyle = series.color;
                 ctx.fill();
+                ctx.globalAlpha = 1.0;
             }
             
             // Legend
             ctx.fillStyle = series.color;
             ctx.font = '10px JetBrains Mono';
             ctx.textAlign = 'right';
-            const lastVal = series.data[series.data.length-1] || 0;
-            ctx.fillText(`${series.label}: ${lastVal.toFixed(1)}`, graphX + graphW, graphY - 20 + sIdx * 12);
+            const lastVal = series.data[series.data.length - 1] || 0;
+            let valStr = "";
+            if (Math.abs(lastVal) > 999999 || Math.abs(lastVal) < 0.001) {
+                valStr = lastVal === 0 ? "0.0" : lastVal.toExponential(2);
+            } else {
+                valStr = lastVal.toFixed(1);
+            }
+            ctx.fillText(`${series.label}: ${valStr}`, graphX + graphW, graphY - 20 + sIdx * 12);
         }
         ctx.restore();
     }
 
     drawGauge(title, value, min, max, unit, x, y, radius, color) {
+        if (!isFinite(value) || isNaN(value)) value = 0; // Prevent Infinity/-Infinity UI breakage
+
         const ctx = this.ctx;
         ctx.save();
         ctx.translate(x, y);
@@ -358,7 +368,8 @@ class Renderer {
         ctx.font = `bold ${radius * 0.4}px Inter`;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
-        ctx.fillText(value.toFixed(1), 0, 0);
+        let displayVal = value > 9999 ? value.toExponential(1) : value.toFixed(1);
+        ctx.fillText(displayVal, 0, 0);
 
         ctx.fillStyle = 'rgba(255,255,255,0.5)';
         ctx.font = `${radius * 0.2}px Inter`;

@@ -366,8 +366,8 @@ const MechanicsModule = {
             const heightMeters = (h - b.radius - b.pos.y) / SCALE;
             const peReal = b.mass * this.params.gravity * Math.max(0, heightMeters);
             
-            totalKE += keReal;
-            totalPE += peReal;
+            totalKE += isNaN(keReal) || !isFinite(keReal) ? 0 : keReal;
+            totalPE += isNaN(peReal) || !isFinite(peReal) ? 0 : peReal;
         }
         
         if (!this.history) this.history = [];
@@ -381,12 +381,13 @@ const MechanicsModule = {
             renderer.drawChart('Dinâmica do Sistema (J)', [keSeries, peSeries], w - 370, 20, 350, 200);
             
             if (this.world.bodies.length > 0) {
-                const maxVel = Math.max(...this.world.bodies.map(b => b.vel.mag() / SCALE));
+                const validBodies = this.world.bodies.filter(b => isFinite(b.vel.mag()));
+                const maxVel = validBodies.length > 0 ? Math.max(...validBodies.map(b => b.vel.mag() / SCALE)) : 0;
                 renderer.drawGauge('Vel. Máxima', maxVel, 0, 50, 'm/s', w - 195, 310, 60, '#22b8cf');
             }
         }
 
-        UI.setInfoPills([`⚙ Mecânica`, `🔵 ${this.world.bodies.length} corpos`, `⚡ E = ${totalKE.toFixed(1)} J`]);
+        UI.setInfoPills([`⚙ Mecânica`, `🔵 ${this.world.bodies.length} corpos`, `⚡ E = ${(totalKE + totalPE).toFixed(1)} J`]);
     },
 
     destroy() { this.world.clear(); this.dragging = null; this.history = []; }
