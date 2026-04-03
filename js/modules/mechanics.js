@@ -354,9 +354,30 @@ const MechanicsModule = {
         for (const ex of this.explosions) renderer.drawCircle(ex.x, ex.y, 2 + ex.life * 6, `rgba(255, 146, 43, ${ex.life})`);
 
         let totalKE = 0;
-        for (const b of this.world.bodies) totalKE += b.kineticEnergy();
+        let totalPE = 0;
+        for (const b of this.world.bodies) {
+            totalKE += b.kineticEnergy();
+            totalPE += b.mass * this.params.gravity * (h - b.pos.y);
+        }
+        
+        if (!this.history) this.history = [];
+        this.history.push({ ke: totalKE, pe: totalPE, t: totalKE + totalPE });
+        if (this.history.length > 150) this.history.shift();
+
+        if (this.history.length > 0) {
+            const maxPoints = 150;
+            const keSeries = { data: this.history.map(h => h.ke), color: '#339af0', label: 'E. Cinética', maxPoints, fill: true };
+            const peSeries = { data: this.history.map(h => h.pe), color: '#ff6b6b', label: 'E. Potencial', maxPoints, fill: true };
+            renderer.drawChart('Dinâmica do Sistema (J)', [keSeries, peSeries], w - 370, 20, 350, 200);
+            
+            if (this.world.bodies.length > 0) {
+                const maxVel = Math.max(...this.world.bodies.map(b => b.vel.mag()));
+                renderer.drawGauge('Vel. Máxima', maxVel, 0, 1500, 'px/s', w - 195, 310, 60, '#22b8cf');
+            }
+        }
+
         UI.setInfoPills([`⚙ Mecânica`, `🔵 ${this.world.bodies.length} corpos`, `⚡ E = ${totalKE.toFixed(0)} J`]);
     },
 
-    destroy() { this.world.clear(); this.dragging = null; }
+    destroy() { this.world.clear(); this.dragging = null; this.history = []; }
 };

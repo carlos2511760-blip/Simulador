@@ -181,6 +181,21 @@ const FluidsModule = {
             }
         }
 
+        const maxDepth = h - this.waterLevel;
+        const P_bot = this.params.fluidDensity * this.params.gravity * maxDepth * 0.01;
+        renderer.drawGauge('Pressão Fundo', P_bot, 0, 500, 'kPa', w - 120, 100, 60, '#339af0');
+        
+        let avgSubmerged = 0;
+        if (this.objects.length > 0) {
+            let sumFrac = 0;
+            for(const obj of this.objects) {
+                const submergedH = Math.max(0, Math.min(obj.y + obj.height, h) - Math.max(obj.y, this.waterLevel));
+                sumFrac += submergedH / obj.height;
+            }
+            avgSubmerged = sumFrac / this.objects.length;
+        }
+        renderer.drawGauge('Submersão Méd.', avgSubmerged * 100, 0, 100, '%', w - 120, 260, 60, '#ff9f43');
+
         UI.setInfoPills([`🧪 Fluidos`, `${this.params.fluidType}`, `ρ = ${this.params.fluidDensity} kg/m³`]);
     },
     destroy() { this.objects = []; this.particles = []; this.splashes = []; }

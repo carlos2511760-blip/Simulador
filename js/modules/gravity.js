@@ -340,15 +340,39 @@ const GravityModule = {
         }
 
         // Info
-        let totalMass = 0, totalKE = 0;
-        for (const b of this.bodies) {
+        let totalMass = 0, totalKE = 0, totalPE = 0;
+        for (let i = 0; i < this.bodies.length; i++) {
+            const b = this.bodies[i];
             totalMass += b.mass;
             totalKE += b.kineticEnergy();
+            for (let j = i + 1; j < this.bodies.length; j++) {
+                const b2 = this.bodies[j];
+                const dist = Math.max(b.pos.dist(b2.pos), 10);
+                totalPE -= (this.params.G * b.mass * b2.mass) / dist; // Gravitational PE is negative
+            }
         }
+        
+        if (!this.history) this.history = [];
+        this.history.push({ ke: totalKE, pe: totalPE, t: totalKE + totalPE });
+        if (this.history.length > 150) this.history.shift();
+
+        if (this.history.length > 0) {
+            const maxPoints = 150;
+            const keSeries = { data: this.history.map(h => h.ke), color: '#339af0', label: 'E. Cinética', maxPoints, fill: false };
+            const peSeries = { data: this.history.map(h => h.pe), color: '#ff6b6b', label: 'E. Potencial', maxPoints, fill: false };
+            const tSeries = { data: this.history.map(h => h.t), color: '#ffd43b', label: 'E. Total', maxPoints, fill: false };
+            renderer.drawChart('Gravitação Universal (J)', [keSeries, peSeries, tSeries], renderer.width - 370, 20, 350, 180);
+            
+            if (this.bodies.length > 0) {
+                const maxSpeed = Math.max(...this.bodies.map(b => b.vel.mag()));
+                renderer.drawGauge('Vel. Máxima', maxSpeed, 0, 800, 'km/s', renderer.width - 195, 290, 60, '#9d7cff');
+            }
+        }
+
         UI.updateInfo('grav-info', `
       Corpos: ${this.bodies.length}<br>
       Massa Total: ${totalMass.toFixed(1)}<br>
-      Energia Cinética: ${totalKE.toFixed(1)} J<br>
+      E. Total: ${(totalKE + totalPE).toFixed(1)} J<br>
       Tempo: ${this.time.toFixed(1)}s
     `);
 
@@ -363,5 +387,6 @@ const GravityModule = {
         this.bodies = [];
         this.dragging = null;
         this.dragStart = null;
+        this.history = [];
     }
 };

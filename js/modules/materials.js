@@ -160,16 +160,34 @@ const MaterialsModule = {
         renderer.drawRect(0, h - 40, w, 40, 'rgba(255,255,255,0.02)');
         renderer.drawLine(new Vec2(0, h - 40), new Vec2(w, h - 40), 'rgba(255,255,255,0.1)', 1);
 
+        let maxStress = 0;
+        let avgStress = 0;
         for (const c of this.constraints) {
+            if (c.stress > maxStress) maxStress = c.stress;
+            avgStress += c.stress;
             const stress = Math.min(c.stress * 4 / this.params.structuralIntegrity, 1);
             const color = `rgba(${Math.floor(255*stress)}, ${Math.floor(255*(1-stress))}, 100, 0.8)`;
             renderer.drawLine(this.nodes[c.a].pos, this.nodes[c.b].pos, color, 3);
         }
+        if (this.constraints.length > 0) avgStress /= this.constraints.length;
+        
+        if (!this.history) this.history = [];
+        this.history.push({ ms: maxStress, as: avgStress });
+        if (this.history.length > 150) this.history.shift();
+
+        if (this.history.length > 0) {
+            const h1 = { data: this.history.map(h => h.ms), color: '#ff6b6b', label: 'Tensão Máx', maxPoints: 150, fill: true };
+            const h2 = { data: this.history.map(h => h.as), color: '#51cf66', label: 'Tensão Méd', maxPoints: 150, fill: false };
+            renderer.drawChart('Monitor de Tensão', [h1, h2], w - 370, 20, 350, 160);
+            
+            renderer.drawGauge('Integridade', this.params.structuralIntegrity, 0, 2, '', w - 120, 260, 60, '#e599f7');
+        }
+
         for (const n of this.nodes) {
             const color = n.fixed ? '#e599f7' : '#fff';
             renderer.drawCircle(n.pos.x, n.pos.y, n.radius || 4, color);
         }
         UI.setInfoPills([`🧱 Materiais`, `Nós: ${this.nodes.length}`, `Links: ${this.constraints.length}`]);
     },
-    destroy() { this.nodes = []; this.constraints = []; }
+    destroy() { this.nodes = []; this.constraints = []; this.history = []; }
 };

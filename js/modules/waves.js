@@ -265,6 +265,19 @@ const WavesModule = {
         // Info
         const period = 1 / frequency;
         const velocity = frequency * wavelength;
+        
+        if (!this.history) this.history = [];
+        this.history.push({ x: amplitude * Math.sin(omega * t) });
+        if (this.history.length > 150) this.history.shift();
+
+        if (this.history.length > 0) {
+            const histSeries = { data: this.history.map(h => h.x), color: '#3498db', label: 'Deslocamento', maxPoints: 150, fill: false };
+            renderer.drawChart('Oscilógrafo', [histSeries], w - 370, 20, 350, 150);
+            
+            renderer.drawGauge('Freq', frequency, 0, 10, 'Hz', w - 280, 260, 60, '#2ecc71');
+            renderer.drawGauge('Comp.', wavelength, 100, 500, 'px', w - 110, 260, 60, '#f1c40f');
+        }
+
         UI.updateInfo('waves-info', `
       Frequência: ${frequency.toFixed(1)} Hz<br>
       Período: ${period.toFixed(3)} s<br>
@@ -284,5 +297,6 @@ const WavesModule = {
 
     destroy() {
         this.sources = [];
+        this.history = [];
     }
 };

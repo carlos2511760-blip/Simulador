@@ -114,8 +114,22 @@ const ThermodynamicsModule = {
         }
 
         const P = (this.params.numParticles * this.params.temperature) / (this.params.volume * 1000);
-        UI.updateInfo('thermo-info', `Pressão: ${P.toFixed(2)} atm<br>T: ${Math.round(this.params.temperature)} K`);
+        if (!this.history) this.history = [];
+        this.history.push({ P, T: this.params.temperature });
+        if (this.history.length > 150) this.history.shift();
+
+        if (this.history.length > 0) {
+            const tempSeries = { data: this.history.map(h => h.T), color: '#ff6b6b', label: 'T (K)', maxPoints: 150, fill: false };
+            const presSeries = { data: this.history.map(h => h.P), color: '#339af0', label: 'P (atm)', maxPoints: 150, fill: true };
+
+            renderer.drawChart('Estado Termodinâmico', [presSeries], w - 370, 20, 350, 160);
+            
+            renderer.drawGauge('Temperatura', this.params.temperature, 0, 3000, 'K', w - 195, 270, 60, '#ff922b');
+            renderer.drawGauge('Pressão', P, 0, Math.max(10, Math.max(...this.history.map(h=>h.P))), 'atm', w - 200, 420, 60, '#339af0');
+        }
+
+        UI.updateInfo('thermo-info', `Pressão: ${P.toFixed(2)} atm<br>T: ${Math.round(this.params.temperature)} K<br>V: ${(this.params.volume * 1000).toFixed(0)} L`);
         UI.setInfoPills([`🔥 Termo`, `P = ${P.toFixed(1)} atm`, `T = ${Math.round(this.params.temperature)} K`]);
     },
-    destroy() { this.particles = []; }
+    destroy() { this.particles = []; this.history = []; }
 };

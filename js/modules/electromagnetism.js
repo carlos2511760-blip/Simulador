@@ -305,6 +305,29 @@ const ElectromagnetismModule = {
         }
 
         // Info
+        let maxPot = 0;
+        let avgPot = 0;
+        let cPos = 0, cNeg = 0;
+        for (const c of this.charges) {
+            if (c.q > 0) cPos++; else cNeg++;
+            const p = Math.abs(this.getPotentialAt(c.x + c.radius + 2, c.y));
+            if (p > maxPot) maxPot = p;
+            avgPot += p;
+        }
+        if (this.charges.length > 0) avgPot /= this.charges.length;
+
+        if (!this.history) this.history = [];
+        this.history.push({ mp: maxPot, ap: avgPot });
+        if (this.history.length > 150) this.history.shift();
+
+        if (this.history.length > 0) {
+            const h1 = { data: this.history.map(h => h.mp), color: '#845ef7', label: 'Potencial Máx', maxPoints: 150, fill: true };
+            renderer.drawChart('Monitor Capacitivo (V)', [h1], w - 370, 20, 350, 150);
+            
+            renderer.drawGauge('Cargas (+)', cPos, 0, 20, '', w - 190, 260, 50, '#ff6b6b');
+            renderer.drawGauge('Cargas (-)', cNeg, 0, 20, '', w - 70, 260, 50, '#339af0');
+        }
+
         UI.updateInfo('electro-info', `
       Cargas: ${this.charges.length}<br>
       Constante k: ${this.params.k}<br>
@@ -322,5 +345,6 @@ const ElectromagnetismModule = {
     destroy() {
         this.charges = [];
         this.dragging = null;
+        this.history = [];
     }
 };

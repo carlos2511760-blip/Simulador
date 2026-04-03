@@ -231,4 +231,142 @@ class Renderer {
         ctx.stroke();
         ctx.restore();
     }
+
+    /* ---- UI Components (In-Canvas) ---- */
+    drawChart(title, dataSeries, x, y, width, height) {
+        const ctx = this.ctx;
+        ctx.save();
+        ctx.fillStyle = 'rgba(15, 15, 25, 0.6)';
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.roundRect(x, y, width, height, 12);
+        ctx.fill();
+        ctx.stroke();
+
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+        ctx.font = 'bold 12px Inter';
+        ctx.textAlign = 'left';
+        ctx.textBaseline = 'top';
+        ctx.fillText(title, x + 15, y + 12);
+
+        if (!dataSeries || dataSeries.length === 0) {
+            ctx.restore();
+            return;
+        }
+
+        const padX = 15;
+        const padYTop = 35;
+        const padYBot = 15;
+        const graphW = width - padX * 2;
+        const graphH = height - padYTop - padYBot;
+        const graphX = x + padX;
+        const graphY = y + padYTop;
+
+        let minVal = 0, maxVal = 0.0001;
+        for (const series of dataSeries) {
+            for (const pt of series.data) {
+                if (pt > maxVal) maxVal = pt;
+                if (pt < minVal) minVal = pt;
+            }
+        }
+        
+        // Dynamic range with 10% padding
+        const padding = (maxVal - minVal) * 0.1;
+        maxVal += padding;
+        if (minVal < 0) minVal -= padding;
+        const range = maxVal - minVal;
+
+        // Grid lines
+        ctx.strokeStyle = 'rgba(255,255,255,0.05)';
+        ctx.beginPath();
+        for(let i=0; i<=4; i++) {
+            const gy = graphY + (i/4)*graphH;
+            ctx.moveTo(graphX, gy); ctx.lineTo(graphX+graphW, gy);
+        }
+        ctx.stroke();
+
+        for (let sIdx = 0; sIdx < dataSeries.length; sIdx++) {
+            const series = dataSeries[sIdx];
+            if (series.data.length < 2) continue;
+            
+            ctx.beginPath();
+            ctx.strokeStyle = series.color || '#fff';
+            ctx.lineWidth = 2.5;
+            ctx.lineJoin = 'round';
+            const stepX = graphW / (series.maxPoints - 1);
+            
+            for (let i = 0; i < series.data.length; i++) {
+                const val = series.data[i];
+                const ptX = graphX + i * stepX;
+                const ptY = graphY + graphH - ((val - minVal) / range) * graphH;
+                if (i === 0) ctx.moveTo(ptX, ptY);
+                else ctx.lineTo(ptX, ptY);
+            }
+            ctx.stroke();
+
+            // Fill area optionally
+            if (series.fill) {
+                ctx.lineTo(graphX + (series.data.length - 1) * stepX, graphY + graphH);
+                ctx.lineTo(graphX, graphY + graphH);
+                ctx.fillStyle = series.color.replace('rgb', 'rgba').replace('hsl', 'hsla').replace(')', ',0.15)');
+                ctx.fill();
+            }
+            
+            // Legend
+            ctx.fillStyle = series.color;
+            ctx.font = '10px JetBrains Mono';
+            ctx.textAlign = 'right';
+            const lastVal = series.data[series.data.length-1] || 0;
+            ctx.fillText(`${series.label}: ${lastVal.toFixed(1)}`, graphX + graphW, graphY - 20 + sIdx * 12);
+        }
+        ctx.restore();
+    }
+
+    drawGauge(title, value, min, max, unit, x, y, radius, color) {
+        const ctx = this.ctx;
+        ctx.save();
+        ctx.translate(x, y);
+
+        // Background arc
+        ctx.beginPath();
+        ctx.arc(0, 0, radius, Math.PI * 0.8, Math.PI * 2.2);
+        ctx.strokeStyle = 'rgba(255,255,255,0.1)';
+        ctx.lineWidth = radius * 0.15;
+        ctx.lineCap = 'round';
+        ctx.stroke();
+
+        // Value arc
+        const pct = Math.max(0, Math.min(1, (value - min) / (max - min)));
+        const endAngle = Math.PI * 0.8 + pct * (Math.PI * 1.4);
+        
+        // Glow
+        ctx.shadowColor = color;
+        ctx.shadowBlur = 10;
+
+        ctx.beginPath();
+        ctx.arc(0, 0, radius, Math.PI * 0.8, endAngle);
+        ctx.strokeStyle = color;
+        ctx.lineWidth = radius * 0.15;
+        ctx.lineCap = 'round';
+        ctx.stroke();
+
+        ctx.shadowBlur = 0;
+
+        // Text
+        ctx.fillStyle = 'rgba(255,255,255,0.9)';
+        ctx.font = `bold ${radius * 0.4}px Inter`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(value.toFixed(1), 0, 0);
+
+        ctx.fillStyle = 'rgba(255,255,255,0.5)';
+        ctx.font = `${radius * 0.2}px Inter`;
+        ctx.fillText(unit, 0, radius * 0.35);
+
+        ctx.font = `bold ${radius * 0.25}px Inter`;
+        ctx.fillText(title, 0, radius * 0.7);
+
+        ctx.restore();
+    }
 }

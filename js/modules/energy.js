@@ -208,6 +208,27 @@ const EnergyModule = {
             const latest = this.energyHistory[this.energyHistory.length - 1];
             UI.updateInfo('energy-info', `EC (Cinética): ${latest.ke.toFixed(0)} J<br>EP (Potencial): ${latest.pe.toFixed(0)} J<br>ET (Total): ${latest.total.toFixed(0)} J`);
             UI.setInfoPills([`⚡ Energia`, `E = ${latest.total.toFixed(0)} J`]);
+
+            // Draw real-time Energy chart on canvas
+            const maxPoints = 150;
+            const keData = this.energyHistory.map(e => e.ke);
+            const peData = this.energyHistory.map(e => e.pe);
+            const tData = this.energyHistory.map(e => e.total);
+
+            const series = [
+                { data: keData, color: '#339af0', label: 'Cinética', maxPoints, fill: true },
+                { data: peData, color: '#ff6b6b', label: 'Potencial', maxPoints, fill: true },
+                { data: tData, color: '#ffd43b', label: 'Total', maxPoints, fill: false }
+            ];
+
+            const chartW = 350;
+            const chartH = 200;
+            renderer.drawChart('Conservação de Energia (J)', series, w - chartW - 20, 20, chartW, chartH);
+            
+            // Draw energy gauge on canvas
+            const maxEnergyE = Math.max(...tData, 100);
+            renderer.drawGauge('Cinética', latest.ke, 0, latest.total > 0 ? latest.total : 100, 'J', w - chartW/2 - 90, 240 + 70, 50, '#339af0');
+            renderer.drawGauge('Potencial', latest.pe, 0, latest.total > 0 ? latest.total : 100, 'J', w - chartW/2 + 70, 240 + 70, 50, '#ff6b6b');
         }
     },
 
