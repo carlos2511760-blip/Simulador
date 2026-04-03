@@ -173,9 +173,24 @@ const EnergyModule = {
         if (this.ball) {
             const h = this.renderer.height, mass = this.params.mass;
             let ke = 0, pe = 0;
-            if (this.scenario === 'skate') { ke = 0.5 * mass * this.ball.speed * this.ball.speed; pe = mass * g * (h - this.ball.pos.y); }
-            else if (this.scenario === 'freefall') { ke = 0.5 * mass * this.ball.vel.magSq() * 0.1; pe = mass * g * (this.ball.groundY - this.ball.pos.y) * 0.1; }
-            else if (this.scenario === 'pendulum_energy') { ke = 0.5 * mass * (this.ball.angularVel * this.ball.length)**2 * 0.1; pe = mass * g * (this.ball.length - this.ball.length * Math.cos(this.ball.angle)) * 0.1; }
+            const SCALE = 50; // 50 pixels = 1 meter
+            
+            if (this.scenario === 'skate') { 
+                const v_m = this.ball.speed / SCALE;
+                ke = 0.5 * mass * v_m * v_m; 
+                pe = mass * g * Math.max(0, (h - this.ball.pos.y) / SCALE); 
+            }
+            else if (this.scenario === 'freefall') { 
+                const v_m = this.ball.vel.mag() / SCALE;
+                ke = 0.5 * mass * v_m * v_m; 
+                pe = mass * g * Math.max(0, (this.ball.groundY - this.ball.pos.y) / SCALE); 
+            }
+            else if (this.scenario === 'pendulum_energy') { 
+                const v_m = Math.abs(this.ball.angularVel * this.ball.length) / SCALE;
+                ke = 0.5 * mass * v_m * v_m; 
+                pe = mass * g * Math.max(0, (this.ball.length - this.ball.length * Math.cos(this.ball.angle)) / SCALE); 
+            }
+            
             this.energyHistory.push({ ke, pe, total: ke + pe });
             if (this.energyHistory.length > 150) this.energyHistory.shift();
         }

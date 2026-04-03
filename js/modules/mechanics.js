@@ -51,10 +51,10 @@ const MechanicsModule = {
                     title: 'Controles',
                     type: 'controls',
                     items: [
-                        { kind: 'select', id: 'mech-type', label: 'Projétil', options: ['🏀 Basquete', '⚽ Futebol', '🎾 Tênis', '💣 Bombe Explisiva', '🍉 Melancia'], value: self.params.projectileType, onChange: v => { self.params.projectileType = v; } },
+                        { kind: 'select', id: 'mech-type', label: 'Projétil', options: ['🏀 Basquete', '⚽ Futebol', '🎾 Tênis', '💣 Bomba Explosiva', '🍉 Melancia'], value: self.params.projectileType, onChange: v => { self.params.projectileType = v; } },
                         { kind: 'slider', id: 'mech-gravity', label: 'Gravidade (g)', min: 0, max: 30, step: 0.1, value: self.params.gravity, unit: ' m/s²', onChange: v => { self.params.gravity = v; } },
                         { kind: 'slider', id: 'mech-angle', label: 'Ângulo', min: 0, max: 90, step: 1, value: self.params.angle, unit: '°', onChange: v => { self.params.angle = v; } },
-                        { kind: 'slider', id: 'mech-speed', label: 'Poder', min: 50, max: 1000, step: 10, value: self.params.speed, unit: '', onChange: v => { self.params.speed = v; } },
+                        { kind: 'slider', id: 'mech-speed', label: 'Poder', min: 20, max: 1000, step: 10, value: self.params.speed, unit: '', onChange: v => { self.params.speed = v; } },
                         { kind: 'button', id: 'mech-launch', label: '🚀 DISPARAR!', onClick: () => self.launchProjectile() },
                         { kind: 'button', id: 'mech-track-hills', label: '⛰️ Pista Colinas', onClick: () => self.setupInclineTrack('hills') },
                         { kind: 'button', id: 'mech-track-u', label: '🛹 Pista U', onClick: () => self.setupInclineTrack('u') },
@@ -155,17 +155,20 @@ const MechanicsModule = {
         const rad = this.params.angle * Math.PI / 180;
         const vx = this.params.speed * Math.cos(rad) * 0.8;
         const vy = -this.params.speed * Math.sin(rad) * 0.8;
-        const emojiMap = { '🏀 Basquete': '🏀', '⚽ Futebol': '⚽', '🎾 Tênis': '🎾', '💣 Bombe Explisiva': '💣', '🍉 Melancia': '🍉' };
+        const emojiMap = { '🏀 Basquete': '🏀', '⚽ Futebol': '⚽', '🎾 Tênis': '🎾', '💣 Bomba Explosiva': '💣', '🍉 Melancia': '🍉' };
+        const realMasses = { '🏀 Basquete': 0.6, '⚽ Futebol': 0.45, '🎾 Tênis': 0.06, '💣 Bomba Explosiva': 10, '🍉 Melancia': 8 }; // Em kg reais
+        const radiusMap = { '🏀 Basquete': 14, '⚽ Futebol': 14, '🎾 Tênis': 8, '💣 Bomba Explosiva': 18, '🍉 Melancia': 20 };
+        const ballType = this.params.projectileType;
         const ball = new Body({
             pos: new Vec2(50, h - 55),
             vel: new Vec2(vx, vy),
-            radius: 18,
-            mass: 2,
-            label: emojiMap[this.params.projectileType] || '●',
+            radius: radiusMap[ballType] || 15,
+            mass: realMasses[ballType] || 1,
+            label: emojiMap[ballType] || '●',
             restitution: 0.6,
             maxTrail: 100,
         });
-        if (this.params.projectileType.includes('Bomb')) ball.userData.isBomb = true;
+        if (ballType.includes('Bomb')) ball.userData.isBomb = true;
         this.world.addBody(ball);
     },
 
@@ -355,9 +358,16 @@ const MechanicsModule = {
 
         let totalKE = 0;
         let totalPE = 0;
+        const SCALE = 50; // 50 pixels = 1 meter
+        
         for (const b of this.world.bodies) {
-            totalKE += b.kineticEnergy();
-            totalPE += b.mass * this.params.gravity * (h - b.pos.y);
+            const velMps = b.vel.mag() / SCALE;
+            const keReal = 0.5 * b.mass * velMps * velMps;
+            const heightMeters = (h - b.radius - b.pos.y) / SCALE;
+            const peReal = b.mass * this.params.gravity * Math.max(0, heightMeters);
+            
+            totalKE += keReal;
+            totalPE += peReal;
         }
         
         if (!this.history) this.history = [];
@@ -371,12 +381,12 @@ const MechanicsModule = {
             renderer.drawChart('Dinâmica do Sistema (J)', [keSeries, peSeries], w - 370, 20, 350, 200);
             
             if (this.world.bodies.length > 0) {
-                const maxVel = Math.max(...this.world.bodies.map(b => b.vel.mag()));
-                renderer.drawGauge('Vel. Máxima', maxVel, 0, 1500, 'px/s', w - 195, 310, 60, '#22b8cf');
+                const maxVel = Math.max(...this.world.bodies.map(b => b.vel.mag() / SCALE));
+                renderer.drawGauge('Vel. Máxima', maxVel, 0, 50, 'm/s', w - 195, 310, 60, '#22b8cf');
             }
         }
 
-        UI.setInfoPills([`⚙ Mecânica`, `🔵 ${this.world.bodies.length} corpos`, `⚡ E = ${totalKE.toFixed(0)} J`]);
+        UI.setInfoPills([`⚙ Mecânica`, `🔵 ${this.world.bodies.length} corpos`, `⚡ E = ${totalKE.toFixed(1)} J`]);
     },
 
     destroy() { this.world.clear(); this.dragging = null; this.history = []; }
